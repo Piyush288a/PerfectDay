@@ -27,6 +27,9 @@ import {
   Info,
   AlertTriangle,
   LogOut,
+  Trash2,
+  Circle,
+  List,
 } from "lucide";
 
 export const initIcons = () => {
@@ -59,6 +62,9 @@ export const initIcons = () => {
       Info,
       AlertTriangle,
       LogOut,
+      Trash2,
+      Circle,
+      List,
     },
   });
 };

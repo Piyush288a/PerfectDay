@@ -1,6 +1,13 @@
 import { renderThemeToggleHTML } from "../components/ThemeToggle.js";
 import { showToast } from "../components/Toast.js";
 import { authStore } from "../store/auth.js";
+import { listStore } from "../store/lists.js";
+import { taskStore } from "../store/tasks.js";
+import { renderTaskItemHTML } from "../components/TaskItem.js";
+import { initIcons } from "../utils/icons.js";
+
+let unsubscribeListStore = null;
+let unsubscribeTaskStore = null;
 
 const getInitials = (user) => {
   if (user?.displayName) {
@@ -16,16 +23,92 @@ const getInitials = (user) => {
   return "PD";
 };
 
-export const renderAppShellView = () => {
-  const { user } = authStore.getState();
-  const initials = getInitials(user);
-  const userName = user?.displayName || user?.email?.split("@")[0] || "User";
-
+const getContextMeta = (currentView, lists) => {
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
   });
+
+  if (currentView === "my-day") {
+    return {
+      title: "My Day",
+      subtitle: "Focus on what matters most today.",
+      date: today,
+      placeholder: "Add a task for today...",
+      emptyTitle: "Your day is clear",
+      emptyDesc: "Tasks you add for today will appear here. Plan your day with clarity and focus.",
+      emptyIcon: "sun",
+    };
+  }
+
+  if (currentView === "important") {
+    return {
+      title: "Important",
+      subtitle: "Prioritize your highest impact items.",
+      date: null,
+      placeholder: "Add an important task...",
+      emptyTitle: "No important tasks",
+      emptyDesc: "Star tasks to highlight priorities and keep them organized here.",
+      emptyIcon: "star",
+    };
+  }
+
+  if (currentView === "planned") {
+    return {
+      title: "Planned",
+      subtitle: "Keep track of scheduled deadlines.",
+      date: null,
+      placeholder: "Add a task with a due date...",
+      emptyTitle: "No planned tasks",
+      emptyDesc: "Tasks with upcoming due dates will automatically appear here.",
+      emptyIcon: "calendar",
+    };
+  }
+
+  if (currentView === "all-tasks") {
+    return {
+      title: "Tasks",
+      subtitle: "All your active and completed tasks.",
+      date: null,
+      placeholder: "Add a task...",
+      emptyTitle: "All caught up",
+      emptyDesc: "You don't have any tasks right now. Create one above to get started.",
+      emptyIcon: "list-todo",
+    };
+  }
+
+  // Custom list
+  const activeList = lists.find((l) => l.id === currentView);
+  const listName = activeList ? activeList.name : "List";
+
+  return {
+    title: listName,
+    subtitle: `Tasks in ${listName}`,
+    date: null,
+    placeholder: `Add a task to ${listName}...`,
+    emptyTitle: `No tasks in ${listName}`,
+    emptyDesc: "Create tasks specifically for this list to stay organized.",
+    emptyIcon: "layout-grid",
+    listId: currentView,
+  };
+};
+
+export const renderAppShellView = () => {
+  const { user } = authStore.getState();
+  const { lists } = listStore.getState();
+  const { currentView } = taskStore.getState();
+
+  const initials = getInitials(user);
+  const userName = user?.displayName || user?.email?.split("@")[0] || "User";
+  const meta = getContextMeta(currentView, lists);
+
+  // Default tasks list item
+  const defaultList = listStore.getDefaultList();
+  const defaultListCount = defaultList?._count?.tasks || 0;
+
+  // Custom lists (excluding default list)
+  const customLists = lists.filter((l) => !l.isDefault);
 
   return `
   <div class="app-shell">
@@ -82,92 +165,117 @@ export const renderAppShellView = () => {
 
           <!-- Main Views -->
           <nav class="sidebar-nav-section" aria-label="Main Views">
-            <a href="javascript:void(0)" class="sidebar-nav-item active" data-nav="my-day">
+            <a href="javascript:void(0)" class="sidebar-nav-item ${currentView === "my-day" ? "active" : ""}" data-nav="my-day">
               <div class="sidebar-nav-item-left">
                 <i data-lucide="sun" style="width: 18px; height: 18px;"></i>
                 <span>My Day</span>
               </div>
-              <span class="sidebar-badge">0</span>
             </a>
 
-            <a href="javascript:void(0)" class="sidebar-nav-item" data-nav="important">
+            <a href="javascript:void(0)" class="sidebar-nav-item ${currentView === "important" ? "active" : ""}" data-nav="important">
               <div class="sidebar-nav-item-left">
                 <i data-lucide="star" style="width: 18px; height: 18px;"></i>
                 <span>Important</span>
               </div>
             </a>
 
-            <a href="javascript:void(0)" class="sidebar-nav-item" data-nav="planned">
+            <a href="javascript:void(0)" class="sidebar-nav-item ${currentView === "planned" ? "active" : ""}" data-nav="planned">
               <div class="sidebar-nav-item-left">
                 <i data-lucide="calendar" style="width: 18px; height: 18px;"></i>
                 <span>Planned</span>
               </div>
             </a>
 
-            <a href="javascript:void(0)" class="sidebar-nav-item" data-nav="all-tasks">
+            <a href="javascript:void(0)" class="sidebar-nav-item ${currentView === "all-tasks" ? "active" : ""}" data-nav="all-tasks">
               <div class="sidebar-nav-item-left">
                 <i data-lucide="list-todo" style="width: 18px; height: 18px;"></i>
                 <span>Tasks</span>
               </div>
+              ${defaultListCount > 0 ? `<span class="sidebar-badge">${defaultListCount}</span>` : ""}
             </a>
           </nav>
 
           <!-- Custom Lists -->
           <div class="sidebar-section-title">Lists</div>
-          <nav class="sidebar-nav-section" aria-label="Custom Lists">
-            <a href="javascript:void(0)" class="sidebar-nav-item" data-nav="list-personal">
-              <div class="sidebar-nav-item-left">
-                <i data-lucide="layout-grid" style="width: 16px; height: 16px;"></i>
-                <span>Personal</span>
-              </div>
-            </a>
+          <nav class="sidebar-nav-section" id="sidebar-custom-lists" aria-label="Custom Lists">
+            ${customLists
+              .map(
+                (list) => `
+                <div class="sidebar-list-item ${currentView === list.id ? "active" : ""}" data-nav="${list.id}">
+                  <div class="sidebar-nav-item-left">
+                    <i data-lucide="layout-grid" style="width: 16px; height: 16px;"></i>
+                    <span>${escapeHTML(list.name)}</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    ${list._count?.tasks > 0 ? `<span class="sidebar-badge">${list._count.tasks}</span>` : ""}
+                    <div class="sidebar-list-actions">
+                      <button 
+                        type="button" 
+                        class="sidebar-list-btn delete-list-btn" 
+                        data-action="delete-list" 
+                        data-list-id="${list.id}"
+                        data-list-count="${list._count?.tasks || 0}"
+                        title="Delete list" 
+                        aria-label="Delete list"
+                      >
+                        <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              `
+              )
+              .join("")}
           </nav>
 
-          <button type="button" class="sidebar-add-list-btn" id="add-list-btn">
-            <i data-lucide="plus" style="width: 16px; height: 16px;"></i>
-            <span>New list</span>
-          </button>
+          <!-- Inline Add List Area -->
+          <div id="inline-add-list-container">
+            <button type="button" class="sidebar-add-list-btn" id="add-list-btn">
+              <i data-lucide="plus" style="width: 16px; height: 16px;"></i>
+              <span>New list</span>
+            </button>
+          </div>
         </div>
 
         <div style="padding-top: var(--space-4); border-top: 1px solid var(--color-border-subtle); font-size: var(--text-xs); color: var(--color-text-muted);">
-          <span>PerfectDay v0.6.0</span>
+          <span>PerfectDay v0.7.0</span>
         </div>
       </aside>
 
       <!-- Main Workspace -->
-      <main class="shell-workspace">
+      <main class="shell-workspace" id="shell-workspace">
         <div class="workspace-header">
           <div class="workspace-title-row">
-            <h1 class="workspace-title">My Day</h1>
-            <span class="workspace-date">${today}</span>
+            <div class="workspace-title-left">
+              <h1 class="workspace-title" id="workspace-title">${escapeHTML(meta.title)}</h1>
+              ${meta.date ? `<span class="workspace-date">${meta.date}</span>` : ""}
+            </div>
           </div>
-          <p class="text-secondary text-sm">Focus on what matters most today.</p>
+          <p class="workspace-subtitle" id="workspace-subtitle">${meta.subtitle}</p>
         </div>
 
         <!-- Quick Add Bar -->
-        <div class="quick-add-task-bar">
+        <form class="quick-add-task-bar" id="quick-add-form">
           <i data-lucide="plus" style="width: 18px; height: 18px; color: var(--color-primary);"></i>
           <input 
             type="text" 
             class="quick-add-input" 
             id="quick-task-input" 
-            placeholder="Add a task for today..." 
+            placeholder="${meta.placeholder}" 
             aria-label="Add a task"
+            autocomplete="off"
           />
-          <button type="button" class="btn btn-primary" id="quick-add-btn" style="padding: 0.45rem 1rem; font-size: var(--text-xs);">
+          <button type="submit" class="btn btn-primary" id="quick-add-btn" style="padding: 0.45rem 1rem; font-size: var(--text-xs);">
             <span>Add</span>
           </button>
-        </div>
+        </form>
 
-        <!-- Empty State Preview -->
-        <div class="workspace-empty-state">
-          <div class="empty-state-icon-wrap">
-            <i data-lucide="sparkles" style="width: 28px; height: 28px;"></i>
+        <!-- Tasks Content Container -->
+        <div id="workspace-tasks-container">
+          <div class="loading-skeleton">
+            <div class="skeleton-bar"></div>
+            <div class="skeleton-bar"></div>
           </div>
-          <h2 class="empty-state-title">Your day is clear</h2>
-          <p class="empty-state-desc">
-            Tasks you add will appear here. Plan your day with clarity and focus.
-          </p>
         </div>
       </main>
     </div>
@@ -175,7 +283,135 @@ export const renderAppShellView = () => {
   `;
 };
 
+const renderTasksListContent = () => {
+  const { tasks, loading, currentView } = taskStore.getState();
+  const { lists } = listStore.getState();
+  const container = document.getElementById("workspace-tasks-container");
+  if (!container) return;
+
+  if (loading) {
+    container.innerHTML = `
+      <div class="loading-skeleton">
+        <div class="skeleton-bar"></div>
+        <div class="skeleton-bar"></div>
+        <div class="skeleton-bar"></div>
+      </div>
+    `;
+    return;
+  }
+
+  if (tasks.length === 0) {
+    const meta = getContextMeta(currentView, lists);
+    container.innerHTML = `
+      <div class="workspace-empty-state">
+        <div class="empty-state-icon-wrap">
+          <i data-lucide="${meta.emptyIcon}" style="width: 28px; height: 28px;"></i>
+        </div>
+        <h2 class="empty-state-title">${meta.emptyTitle}</h2>
+        <p class="empty-state-desc">${meta.emptyDesc}</p>
+      </div>
+    `;
+    initIcons();
+    return;
+  }
+
+  const activeTasks = tasks.filter((t) => !t.isCompleted);
+  const completedTasks = tasks.filter((t) => t.isCompleted);
+
+  let html = `<div class="task-list-container">`;
+
+  if (activeTasks.length > 0) {
+    html += `
+      <div class="task-list">
+        ${activeTasks.map((task) => renderTaskItemHTML(task, currentView, lists)).join("")}
+      </div>
+    `;
+  }
+
+  if (completedTasks.length > 0) {
+    html += `
+      <div class="task-list-section" style="margin-top: var(--space-4);">
+        <div class="task-section-title">Completed (${completedTasks.length})</div>
+        <div class="task-list">
+          ${completedTasks.map((task) => renderTaskItemHTML(task, currentView, lists)).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  html += `</div>`;
+  container.innerHTML = html;
+  initIcons();
+};
+
+const updateSidebarLists = () => {
+  const { lists } = listStore.getState();
+  const { currentView } = taskStore.getState();
+  const customNav = document.getElementById("sidebar-custom-lists");
+  if (!customNav) return;
+
+  const customLists = lists.filter((l) => !l.isDefault);
+  customNav.innerHTML = customLists
+    .map(
+      (list) => `
+      <div class="sidebar-list-item ${currentView === list.id ? "active" : ""}" data-nav="${list.id}">
+        <div class="sidebar-nav-item-left">
+          <i data-lucide="layout-grid" style="width: 16px; height: 16px;"></i>
+          <span>${escapeHTML(list.name)}</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          ${list._count?.tasks > 0 ? `<span class="sidebar-badge">${list._count.tasks}</span>` : ""}
+          <div class="sidebar-list-actions">
+            <button 
+              type="button" 
+              class="sidebar-list-btn delete-list-btn" 
+              data-action="delete-list" 
+              data-list-id="${list.id}"
+              data-list-count="${list._count?.tasks || 0}"
+              title="Delete list" 
+              aria-label="Delete list"
+            >
+              <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    )
+    .join("");
+
+  // Update default task count badge
+  const defaultList = listStore.getDefaultList();
+  const tasksNavBadge = document.querySelector('[data-nav="all-tasks"] .sidebar-badge');
+  const defaultCount = defaultList?._count?.tasks || 0;
+
+  if (tasksNavBadge) {
+    tasksNavBadge.textContent = defaultCount;
+    tasksNavBadge.style.display = defaultCount > 0 ? "inline-block" : "none";
+  }
+
+  initIcons();
+};
+
+const updateWorkspaceHeader = () => {
+  const { currentView } = taskStore.getState();
+  const { lists } = listStore.getState();
+  const meta = getContextMeta(currentView, lists);
+
+  const titleEl = document.getElementById("workspace-title");
+  const subtitleEl = document.getElementById("workspace-subtitle");
+  const quickInput = document.getElementById("quick-task-input");
+
+  if (titleEl) titleEl.textContent = meta.title;
+  if (subtitleEl) subtitleEl.textContent = meta.subtitle;
+  if (quickInput) quickInput.placeholder = meta.placeholder;
+};
+
 export const initAppShellEvents = () => {
+  // Clean previous subscriptions if any
+  if (unsubscribeListStore) unsubscribeListStore();
+  if (unsubscribeTaskStore) unsubscribeTaskStore();
+
   // Mobile Sidebar Toggle
   const toggleBtn = document.getElementById("sidebar-toggle");
   const sidebar = document.getElementById("shell-sidebar");
@@ -186,7 +422,7 @@ export const initAppShellEvents = () => {
     });
   }
 
-  // Logout Button Action
+  // Logout Button
   const logoutBtn = document.getElementById("logout-btn");
   if (logoutBtn) {
     logoutBtn.addEventListener("click", async () => {
@@ -207,61 +443,262 @@ export const initAppShellEvents = () => {
     });
   }
 
-  // Sidebar navigation switching
-  const navItems = document.querySelectorAll(".sidebar-nav-item");
-  navItems.forEach((item) => {
-    item.addEventListener("click", (e) => {
+  // Navigation Click Handling (Delegated on Sidebar)
+  if (sidebar) {
+    sidebar.addEventListener("click", async (e) => {
+      // 1. Delete List Click
+      const deleteListBtn = e.target.closest('[data-action="delete-list"]');
+      if (deleteListBtn) {
+        e.stopPropagation();
+        e.preventDefault();
+        const listId = deleteListBtn.dataset.listId;
+        const taskCount = parseInt(deleteListBtn.dataset.listCount || "0", 10);
+
+        if (taskCount > 0) {
+          showToast({
+            message: "Cannot delete a list that contains tasks. Please delete or move tasks first.",
+            type: "error",
+          });
+          return;
+        }
+
+        try {
+          await listStore.deleteList(listId);
+          showToast({
+            message: "List deleted successfully.",
+            type: "info",
+          });
+          if (taskStore.getState().currentView === listId) {
+            taskStore.setView("my-day");
+          }
+        } catch (err) {
+          showToast({
+            message: err.message || "Failed to delete list.",
+            type: "error",
+          });
+        }
+        return;
+      }
+
+      // 2. Navigation Item Click
+      const navItem = e.target.closest("[data-nav]");
+      if (navItem) {
+        e.preventDefault();
+        const targetView = navItem.dataset.nav;
+
+        // Update active class in sidebar
+        document.querySelectorAll("[data-nav]").forEach((el) => el.classList.remove("active"));
+        navItem.classList.add("active");
+
+        // Close sidebar on mobile
+        if (window.innerWidth <= 768 && sidebar) {
+          sidebar.classList.remove("open");
+        }
+
+        taskStore.setView(targetView);
+      }
+    });
+  }
+
+  // Inline List Creation
+  const addListBtn = document.getElementById("add-list-btn");
+  const inlineListContainer = document.getElementById("inline-add-list-container");
+
+  if (addListBtn && inlineListContainer) {
+    addListBtn.addEventListener("click", () => {
+      inlineListContainer.innerHTML = `
+        <form class="inline-add-list-form" id="inline-add-list-form">
+          <input 
+            type="text" 
+            class="inline-add-list-input" 
+            id="inline-list-input" 
+            placeholder="List name..." 
+            autocomplete="off"
+            maxlength="100"
+          />
+        </form>
+      `;
+
+      const form = document.getElementById("inline-add-list-form");
+      const input = document.getElementById("inline-list-input");
+      if (input) input.focus();
+
+      const cancelAddList = () => {
+        inlineListContainer.innerHTML = `
+          <button type="button" class="sidebar-add-list-btn" id="add-list-btn">
+            <i data-lucide="plus" style="width: 16px; height: 16px;"></i>
+            <span>New list</span>
+          </button>
+        `;
+        initAppShellEvents();
+      };
+
+      if (input) {
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") cancelAddList();
+        });
+        input.addEventListener("blur", () => {
+          if (!input.value.trim()) cancelAddList();
+        });
+      }
+
+      if (form) {
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const name = input?.value.trim();
+          if (!name) {
+            cancelAddList();
+            return;
+          }
+
+          try {
+            const newList = await listStore.createList(name);
+            showToast({
+              message: `Created list "${name}".`,
+              type: "info",
+            });
+            cancelAddList();
+            if (newList?.id) {
+              taskStore.setView(newList.id);
+            }
+          } catch (err) {
+            showToast({
+              message: err.message || "Failed to create list.",
+              type: "error",
+            });
+          }
+        });
+      }
+    });
+  }
+
+  // Quick Add Task Form Submission
+  const quickAddForm = document.getElementById("quick-add-form");
+  const quickTaskInput = document.getElementById("quick-task-input");
+  const quickAddBtn = document.getElementById("quick-add-btn");
+
+  if (quickAddForm) {
+    quickAddForm.addEventListener("submit", async (e) => {
       e.preventDefault();
-      navItems.forEach((i) => i.classList.remove("active"));
-      item.classList.add("active");
-      const title = item.querySelector("span")?.textContent || "Tasks";
-      const titleEl = document.querySelector(".workspace-title");
-      if (titleEl) titleEl.textContent = title;
+      const title = quickTaskInput?.value.trim();
+      if (!title) return;
+
+      const { currentView } = taskStore.getState();
+      const taskPayload = { title };
+
+      if (currentView === "my-day") {
+        taskPayload.myDayOn = new Date().toISOString().split("T")[0];
+      } else if (currentView === "important") {
+        taskPayload.priority = "HIGH";
+      } else if (currentView !== "all-tasks" && currentView !== "planned") {
+        // Must be a custom list ID
+        taskPayload.listId = currentView;
+      }
+
+      if (quickAddBtn) quickAddBtn.disabled = true;
+      if (quickTaskInput) quickTaskInput.value = "";
+
+      try {
+        await taskStore.createTask(taskPayload);
+      } catch (err) {
+        showToast({
+          message: err.message || "Failed to create task.",
+          type: "error",
+        });
+        if (quickTaskInput) quickTaskInput.value = title;
+      } finally {
+        if (quickAddBtn) quickAddBtn.disabled = false;
+        if (quickTaskInput) quickTaskInput.focus();
+      }
+    });
+  }
+
+  // Workspace Delegated Task Item Actions
+  const workspace = document.getElementById("shell-workspace");
+  if (workspace) {
+    workspace.addEventListener("click", async (e) => {
+      // 1. Completion Toggle
+      const completeBtn = e.target.closest('[data-action="toggle-complete"]');
+      if (completeBtn) {
+        const taskId = completeBtn.dataset.taskId;
+        try {
+          await taskStore.toggleComplete(taskId);
+        } catch (err) {
+          showToast({
+            message: err.message || "Failed to update task.",
+            type: "error",
+          });
+        }
+        return;
+      }
+
+      // 2. Priority Toggle
+      const starBtn = e.target.closest('[data-action="toggle-priority"]');
+      if (starBtn) {
+        const taskId = starBtn.dataset.taskId;
+        try {
+          await taskStore.togglePriority(taskId);
+        } catch (err) {
+          showToast({
+            message: err.message || "Failed to update priority.",
+            type: "error",
+          });
+        }
+        return;
+      }
+
+      // 3. Delete Task
+      const deleteBtn = e.target.closest('[data-action="delete-task"]');
+      if (deleteBtn) {
+        const taskId = deleteBtn.dataset.taskId;
+        try {
+          await taskStore.deleteTask(taskId);
+          showToast({
+            message: "Task deleted.",
+            type: "info",
+          });
+        } catch (err) {
+          showToast({
+            message: err.message || "Failed to delete task.",
+            type: "error",
+          });
+        }
+        return;
+      }
+    });
+  }
+
+  // Store Subscriptions
+  unsubscribeListStore = listStore.subscribe(() => {
+    updateSidebarLists();
+    updateWorkspaceHeader();
+  });
+
+  unsubscribeTaskStore = taskStore.subscribe(() => {
+    renderTasksListContent();
+    updateWorkspaceHeader();
+    // Highlight active nav item
+    const { currentView } = taskStore.getState();
+    document.querySelectorAll("[data-nav]").forEach((el) => {
+      if (el.dataset.nav === currentView) {
+        el.classList.add("active");
+      } else {
+        el.classList.remove("active");
+      }
     });
   });
 
-  // Quick Add Button (Demonstration note for Phase 8 Task CRUD)
-  const quickInput = document.getElementById("quick-task-input");
-  const addBtn = document.getElementById("quick-add-btn");
+  // Initial Data Fetch
+  listStore.fetchLists();
+  taskStore.fetchTasks();
+};
 
-  const handleQuickAdd = () => {
-    const text = quickInput?.value.trim();
-    if (!text) return;
-
-    showToast({
-      message: `Task creation will be connected to the Task API in Phase 8.`,
-      type: "info",
-    });
-
-    if (quickInput) quickInput.value = "";
-  };
-
-  if (addBtn) addBtn.addEventListener("click", handleQuickAdd);
-  if (quickInput) {
-    quickInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") handleQuickAdd();
-    });
-  }
-
-  // Add list button
-  const addListBtn = document.getElementById("add-list-btn");
-  if (addListBtn) {
-    addListBtn.addEventListener("click", () => {
-      showToast({
-        message: "Custom list creation will be connected in Phase 9.",
-        type: "info",
-      });
-    });
-  }
-
-  // Notifications button
-  const notifBtn = document.getElementById("notifications-btn");
-  if (notifBtn) {
-    notifBtn.addEventListener("click", () => {
-      showToast({
-        message: "No new notifications.",
-        type: "info",
-      });
-    });
-  }
+const escapeHTML = (str) => {
+  if (!str) return "";
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 };

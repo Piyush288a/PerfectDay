@@ -2,7 +2,7 @@
 
 A modern personal productivity and to-do app: premium UI, REST API, and PostgreSQL. Inspired by Microsoft To Do and Google Tasks — not a copy of either.
 
-**Status:** Phase 7A — backend core tasks & lists API implemented. Authenticated REST APIs for Lists and Tasks with strict user ownership enforcement, Zod validation, default list preservation, ON DELETE RESTRICT behavior, and My Day filtering.
+**Status:** Phase 7B — frontend tasks & lists integration complete. Connected application shell to live PostgreSQL-backed Tasks and Lists REST APIs via reactive `taskStore` and `listStore`. Real My Day, Important, Planned, All Tasks, and Custom Lists views active with optimistic mutations and server reconciliation.
 
 ## Stack
 

@@ -1,129 +1,126 @@
-# Phase 7A — Backend Core Tasks & Lists API Walkthrough
+# Phase 7B — Frontend Real Tasks & Lists API Integration Walkthrough
 
 ## Summary of Implementation
 
-Phase 7A implements the backend REST APIs for **Lists** and **Tasks** for PerfectDay. All endpoints are protected by JWT authentication cookies (`requireAuth`) and enforce strict user ownership checks using `req.user.userId`. Request payloads and queries are strictly validated with Zod, and business logic is isolated in dedicated service layers using Prisma.
+Phase 7B connects the PerfectDay frontend application shell to the Phase 7A PostgreSQL-backed REST APIs (`/api/tasks` and `/api/lists`). All mock/static demo tasks have been eliminated in favor of real, server-persisted data managed via reactive `taskStore` and `listStore` with optimistic user interactions, error rollback, and server state reconciliation.
 
 ---
 
-## 1. Architecture & Layered Request Flow
+## 1. Architecture & Live Data Flow
 
 ```
-Request (with pd_auth cookie)
-  │
-  ▼
-requireAuth (Middleware) ──► Validates JWT & injects req.user = { userId }
-  │
-  ▼
-validate (Middleware)    ──► Validates req.body, req.params, req.query via Zod
-  │
-  ▼
-Controller               ──► Extracts validated inputs & delegates to service
-  │
-  ▼
-Service                  ──► Enforces ownership & business rules
-  │
-  ▼
-Prisma Client            ──► Scoped PostgreSQL queries (`where: { id, userId }`)
-  │
-  ▼
-Response                 ──► Standard JSON envelope via sendSuccess()
+[ User Interaction ]
+        │
+        ├── Quick Add / Complete / Star / Delete / Create List
+        │
+        ▼
+[ taskStore / listStore ] ◄──── Optimistic UI update (Immediate feedback)
+        │
+        ├── Native fetch API Client (credentials: "include")
+        │
+        ▼
+[ REST API / PostgreSQL ] ───► Backend validation & DB persistence
+        │
+        ├── Success ──► Reconciles sidebar task counters with server
+        │
+        └── Failure ──► Auto-rollback state & display toast notification
 ```
 
----
-
-## 2. API Contracts & Endpoints
-
-### Lists Endpoints (`/api/lists`)
-
-| Method | Endpoint | Description | Request Body / Params | Response |
-| :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/api/lists` | Get all lists for authenticated user (ordered with default first) | None | `200 OK` + List array with `_count.tasks` |
-| `POST` | `/api/lists` | Create a new custom list (`isDefault: false`) | `{ name: string }` | `201 Created` + List object |
-| `PATCH` | `/api/lists/:id` | Rename custom list (ownership-enforced) | `{ name: string }` | `200 OK` + Updated list |
-| `DELETE` | `/api/lists/:id` | Delete custom list (default & non-empty lists rejected) | `id: UUID` | `200 OK` + Success message |
-
-### Tasks Endpoints (`/api/tasks`)
-
-| Method | Endpoint | Description | Request Body / Query / Params | Response |
-| :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/api/tasks` | Get user tasks with query filters | Query: `listId`, `isCompleted`, `priority`, `myDay`, `due`, `search`, `sortBy`, `sortOrder` | `200 OK` + Tasks array with list metadata |
-| `POST` | `/api/tasks` | Create task (auto-assigns to default list if `listId` omitted) | `{ title, notes?, listId?, isCompleted?, dueDate?, myDayOn?, priority?, order?, recurrenceRule?, recurrenceInterval?, recurrenceEndsOn? }` | `201 Created` + Task object |
-| `GET` | `/api/tasks/:id` | Get task details by ID with subtasks and list metadata | `id: UUID` | `200 OK` + Detailed task |
-| `PATCH` | `/api/tasks/:id` | Update task fields (auto-populates/clears `completedAt` on toggle) | Partial task fields | `200 OK` + Updated task |
-| `DELETE` | `/api/tasks/:id` | Delete task (ownership-enforced) | `id: UUID` | `200 OK` + Success message |
+- **Tasks API Client ([`client/src/api/tasks.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/api/tasks.js))**:
+  - `getTasks(filters)`: Queries `/api/tasks` with search parameters (`listId`, `priority`, `myDay`, `due`, `isCompleted`, `sortBy`).
+  - `createTask(data)`: Sends task creation payload (auto-assigns default list if omitted).
+  - `updateTask(id, data)`: Mutates fields (`isCompleted`, `priority`, `title`, `notes`, `dueDate`, `myDayOn`, `listId`).
+  - `deleteTask(id)`: Removes task.
+- **Lists API Client ([`client/src/api/lists.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/api/lists.js))**:
+  - `getLists()`: Retrieves user's lists with task counts.
+  - `createList({ name })`: Creates custom list (`isDefault: false`).
+  - `updateList(id, { name })`: Renames custom list.
+  - `deleteList(id)`: Deletes empty custom list (handles 400 default & 409 non-empty rejections).
 
 ---
 
-## 3. Security & Ownership Rules
+## 2. Supported Views & Query Semantics
 
-1. **Strict User Ownership**:
-   - Every database query scopes access by `userId: req.user.userId`.
-   - Attempting to view, modify, or delete another user's task or list yields an immediate `404 Not Found`.
-   - Creating a task targeting another user's `listId` is rejected with `404 Not Found`.
-2. **Default List Protection**:
-   - The user's default `"Tasks"` list cannot be deleted (returns `400 Bad Request`).
-3. **ON DELETE RESTRICT Preservation**:
-   - Deleting a custom list that still contains tasks is rejected (returns `409 Conflict`), preserving task integrity.
-4. **My Day Semantics**:
-   - Managed directly via `Task.myDayOn` without introducing a redundant database model.
-   - Filtered via `GET /api/tasks?myDay=true`.
+| View | Canonical Backend Query | UI Header & Context |
+| :--- | :--- | :--- |
+| **My Day** | `GET /api/tasks?myDay=true&sortBy=order` | "My Day" + Localized date. New tasks auto-set `myDayOn: todayISO`. |
+| **Important** | `GET /api/tasks?priority=HIGH&sortBy=createdAt` | "Important" + Star icon. New tasks auto-set `priority: "HIGH"`. |
+| **Planned** | `GET /api/tasks?due=upcoming&sortBy=dueDate` | "Planned" + Calendar icon. Shows upcoming scheduled tasks. |
+| **Tasks (All)** | `GET /api/tasks?sortBy=createdAt` | "Tasks" + Total active task count badge in sidebar. |
+| **Custom Lists** | `GET /api/tasks?listId=<UUID>&sortBy=order` | List Title + Dedicated custom list view with task counters. |
+
+---
+
+## 3. UI Components & Micro-Interactions
+
+1. **Modular Task Items ([`client/src/components/TaskItem.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/components/TaskItem.js))**:
+   - **Circular Checkbox**: Optimistically toggles completion status with instant visual feedback; completed tasks group separately with clean strikethrough.
+   - **Priority Star Button**: Instant toggle between `HIGH` (filled gold star) and `NONE`.
+   - **Contextual Badges**: Renders due date pills, list attribution pills, and My Day pills.
+   - **Delete Button**: Discreet trash action for instant task removal.
+2. **Dynamic Sidebar & List Management**:
+   - Lists dynamically render from `listStore` with live server task count badges.
+   - "+ New list" button toggles an inline input directly in the sidebar for fluid list creation.
+   - Custom list trash icon allows deleting empty lists; attempting to delete non-empty lists surfaces the backend `409 Conflict` error gracefully.
+3. **Workspace Header & Quick Add**:
+   - Context-sensitive placeholder and dynamic subtitle for every active view.
+   - Submitting a task via Enter or "Add" immediately posts to backend and updates list badges.
+4. **Loading & Empty States**:
+   - Ambient shimmering skeleton loader during initial fetch and view transitions.
+   - Contextual empty states with custom illustrations and supportive copy for every view.
 
 ---
 
 ## 4. Files Created / Modified
 
 - **Created:**
-  - [`server/src/schemas/list.schema.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/server/src/schemas/list.schema.js): Zod schemas for list creation, updates, and UUID parameter validation.
-  - [`server/src/schemas/task.schema.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/server/src/schemas/task.schema.js): Zod schemas for task creation, updates, and query filters.
-  - [`server/src/services/list.service.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/server/src/services/list.service.js): List business logic, default list protection, and task count queries.
-  - [`server/src/services/task.service.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/server/src/services/task.service.js): Task business logic, dynamic filtering, sorting, and completion timestamp management.
-  - [`server/src/controllers/list.controller.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/server/src/controllers/list.controller.js): List route handlers.
-  - [`server/src/controllers/task.controller.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/server/src/controllers/task.controller.js): Task route handlers.
-  - [`server/src/routes/list.routes.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/server/src/routes/list.routes.js): List route declarations with middleware binding.
-  - [`server/src/routes/task.routes.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/server/src/routes/task.routes.js): Task route declarations with middleware binding.
+  - [`client/src/api/lists.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/api/lists.js): Frontend list REST API client.
+  - [`client/src/api/tasks.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/api/tasks.js): Frontend task REST API client.
+  - [`client/src/store/lists.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/store/lists.js): Reactive `ListStore` with server reconciliation.
+  - [`client/src/store/tasks.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/store/tasks.js): Reactive `TaskStore` with optimistic updates, request ID concurrency control, and rollback.
+  - [`client/src/components/TaskItem.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/components/TaskItem.js): Task item template with completion, star, and delete interactions.
 - **Modified:**
-  - [`server/src/routes/index.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/server/src/routes/index.js): Mounted `/lists` and `/tasks` routers.
-  - [`server/src/middleware/validate.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/server/src/middleware/validate.js): Updated `req.query` validation handling for Express 5.
-  - [`PROJECT_CONTEXT.md`](file:///d:/IGNORE/PROJECTS/PerfectDay/PROJECT_CONTEXT.md): Status updated to Phase 7A complete.
-  - [`README.md`](file:///d:/IGNORE/PROJECTS/PerfectDay/README.md): Documented Lists and Tasks API endpoints.
+  - [`client/src/views/AppShellView.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/views/AppShellView.js): Replaced demo mock data with live subscriptions to `taskStore` and `listStore`.
+  - [`client/src/styles/shell.css`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/styles/shell.css): Added task item, inline list form, and skeleton loader styles.
+  - [`client/src/utils/icons.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/utils/icons.js): Added `Trash2`, `Circle`, `List` icons.
+  - [`PROJECT_CONTEXT.md`](file:///d:/IGNORE/PROJECTS/PerfectDay/PROJECT_CONTEXT.md): Status updated to Phase 7B complete.
+  - [`README.md`](file:///d:/IGNORE/PROJECTS/PerfectDay/README.md): Status updated to Phase 7B complete.
 
 ---
 
-## 5. Verification & Test Results
+## 5. Verification Results
 
 ```
-=== PerfectDay Phase 7A: Backend Core Tasks & Lists API Verification ===
+=== PerfectDay Phase 7B: Frontend Tasks & Lists Integration Verification ===
 
-✅ [PASS] GET /api/health online
-✅ [PASS] GET /api/lists without auth returns 401
-✅ [PASS] GET /api/tasks without auth returns 401
-✅ [PASS] User A registered with cookie
-✅ [PASS] User B registered with cookie
-✅ [PASS] User A has default 'Tasks' list
-✅ [PASS] User A creates custom list
-✅ [PASS] User A renames custom list
-✅ [PASS] Empty list name rejected with 400 Validation Error
-✅ [PASS] Default list deletion rejected (400)
-✅ [PASS] Task created in custom list
-✅ [PASS] Task created without listId auto-assigns to default list
-✅ [PASS] GET /api/tasks?myDay=true filters My Day tasks
-✅ [PASS] GET /api/tasks?listId=... filters tasks by list
-✅ [PASS] Task completion sets completedAt timestamp
-✅ [PASS] Uncompleting task clears completedAt timestamp
-✅ [PASS] GET /api/tasks/:id returns detailed task with list info
-✅ [PASS] User B cannot GET User A's task (404)
-✅ [PASS] User B cannot PATCH User A's task (404)
-✅ [PASS] User B cannot DELETE User A's task (404)
-✅ [PASS] User B cannot PATCH User A's list (404)
-✅ [PASS] User B cannot DELETE User A's list (404)
-✅ [PASS] User B cannot create task targeting User A's list (404)
-✅ [PASS] Deleting list with tasks rejected with 409 Conflict
-✅ [PASS] User A deletes task
-✅ [PASS] User A deletes empty custom list successfully
+✅ [PASS] 1. Backend /api/health online
+✅ [PASS] 2. User A registered with HTTP-only cookie
+✅ [PASS] 3. User B registered with HTTP-only cookie
+✅ [PASS] 4. GET /api/auth/me restores User A session
+✅ [PASS] 5. Real default 'Tasks' list loaded from DB
+✅ [PASS] 6. Create custom list persists to DB
+✅ [PASS] 7. Rename custom list persists to DB
+✅ [PASS] 8. Create My Day task persists to DB
+✅ [PASS] 9. Create Important task (priority=HIGH) persists to DB
+✅ [PASS] 10. Create Planned task persists to DB
+✅ [PASS] 11. Create task in custom list persists to DB
+✅ [PASS] 12. My Day view displays only My Day tasks
+✅ [PASS] 13. Important view displays only HIGH-priority tasks
+✅ [PASS] 14. Planned view displays upcoming due tasks
+✅ [PASS] 15. Custom list view displays only its tasks
+✅ [PASS] 16. Task completion sets completedAt timestamp
+✅ [PASS] 17. Task uncompletion clears completedAt timestamp
+✅ [PASS] 18. Priority toggle (HIGH -> NONE) persists to DB
+✅ [PASS] 19. Moving task to another list persists to DB
+✅ [PASS] 20. Non-empty list deletion returns 409 Conflict
+✅ [PASS] 21. Empty custom list deletion succeeds
+✅ [PASS] 22. Default list deletion rejected (400)
+✅ [PASS] 23. User B cannot see User A's lists
+✅ [PASS] 24. User B cannot access User A's task (404)
+✅ [PASS] 25. Delete task persists to DB
 
-=== Phase 7A Verification Results: 26/26 Passed ===
-🎉 ALL PHASE 7A TESTS PASSED!
+=== Phase 7B Verification Results: 25/25 Passed ===
+🎉 ALL 25 PHASE 7B TESTS PASSED!
 ```
 
-- **Client Production Build**: `npm run build` in `client/` built in `1.21s` with **0 errors**.
+- **Frontend Production Build**: `npm run build` in `client/` succeeded with **0 errors** in `1.17s`.
