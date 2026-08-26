@@ -2,11 +2,11 @@
 
 A modern personal productivity and to-do app: premium UI, REST API, and PostgreSQL. Inspired by Microsoft To Do and Google Tasks — not a copy of either.
 
-**Status:** Phase 4 — authentication implemented. JWT-based HTTP-only cookie authentication, bcrypt password hashing, Zod validation, and protected routes are active.
+**Status:** Phase 6 — frontend authentication integrated. Client API client, reactive auth store, protected routing, session restoration, and real register/login/logout flows connected via HTTP-only cookies.
 
 ## Stack
 
-- **Frontend:** HTML, CSS, Vanilla JS, Vite (GSAP and Lucide later)
+- **Frontend:** HTML5, CSS3 Custom Properties, Vanilla JavaScript, Vite, Lucide Icons
 - **Backend:** Node.js, Express, REST (`/api`)
 - **Data:** PostgreSQL, Prisma ORM
 - **Auth:** JWT (HTTP-only cookies), bcrypt

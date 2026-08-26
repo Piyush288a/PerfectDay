@@ -244,7 +244,7 @@ Required capabilities:
 | **10** | Subtasks, tags, reminders, recurring tasks, and calendar. |
 | **11** | Testing, security, accessibility, performance, responsive design, and production polish. |
 
-**Current phase:** 4 complete. Backend REST API foundation and JWT HTTP-only cookie authentication are implemented. Next: Phase 5 (Frontend design system) when requested.
+**Current phase:** 6 complete. Frontend authentication integrated with backend REST API via HTTP-only cookies (`pd_auth`), reactive `authStore`, route guards, and startup session restoration. Next: Phase 7 (Dashboard UI) when requested.
 
 ---
 

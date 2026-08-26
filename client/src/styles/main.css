@@ -1,17 +1,7 @@
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  font-family: system-ui, sans-serif;
-  line-height: 1.5;
-}
-
-main {
-  max-width: 40rem;
-  margin: 2rem auto;
-  padding: 0 1rem;
-}
+@import "./tokens.css";
+@import "./reset.css";
+@import "./typography.css";
+@import "./components.css";
+@import "./ambient.css";
+@import "./auth.css";
+@import "./shell.css";

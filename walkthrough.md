@@ -1,79 +1,100 @@
-# Phase 4 — Authentication Implementation Walkthrough
+# Phase 6 — Frontend Authentication Integration Walkthrough
 
-## Summary of Changes
+## Summary of Implementation
 
-Phase 4 implements secure, production-grade JWT authentication using HTTP-only cookies, bcrypt password hashing, Zod validation, and protected route middleware for PerfectDay.
-
----
-
-## 1. Architecture & Design Decisions
-
-- **Cookie Security**:
-  - Auth token stored in an `httpOnly: true` cookie named `pd_auth`.
-  - Development configuration: `secure: false`, `sameSite: "lax"`, `maxAge: 1 hour`.
-  - Production configuration: `secure: true`, `sameSite: "lax"`, `maxAge: 1 hour`.
-  - CORS configured with `credentials: true` and `origin: env.CLIENT_ORIGIN`.
-- **JWT Configuration**:
-  - Signed with `env.JWT_SECRET` (strictly validated to at least 32 characters).
-  - Lifetime: `1h`.
-  - Payload contains minimal identity only: `{ userId: user.id }`.
-  - `password`, `passwordHash`, or unnecessary personal data are never placed in JWT.
-- **Password Security**:
-  - Bcrypt with 12 salt rounds.
-  - Policy: minimum 8 characters, maximum 72 characters.
-  - `passwordHash` is never returned in any API response.
-- **Transactional Onboarding**:
-  - User registration creates both the `User` and their default `"Tasks"` `List` (`isDefault: true`) within a single atomic Prisma transaction.
-- **Email Normalization**:
-  - Emails are normalized via `email.trim().toLowerCase()` consistently before all database operations.
-- **Cookie Parser**:
-  - Lightweight custom cookie parser in `src/utils/token.js` extracting `pd_auth` without external `cookie-parser` overhead.
+Phase 6 connects the PerfectDay frontend to the Phase 4 backend authentication REST API using a lightweight API client, a reactive authentication store, protected hash routing, startup session restoration, and secure HTTP-only cookies (`pd_auth`).
 
 ---
 
-## 2. API Endpoints
+## 1. Architecture & Security Flow
 
-| Method | Endpoint | Protection | Description | Response Status |
-| --- | --- | --- | --- | --- |
-| `POST` | `/api/auth/register` | Public | Validates input, hashes password, creates user + default list, sets `pd_auth` cookie | `201 Created` |
-| `POST` | `/api/auth/login` | Public | Validates credentials, verifies bcrypt hash, sets `pd_auth` cookie | `200 OK` |
-| `POST` | `/api/auth/logout` | Public | Clears `pd_auth` cookie | `200 OK` |
-| `GET` | `/api/auth/me` | Protected (`requireAuth`) | Reads `pd_auth` cookie, verifies JWT, returns safe user object | `200 OK` |
+```
+┌─────────────────┐       GET /api/auth/me        ┌─────────────────┐
+│                 ├──────────────────────────────►│                 │
+│  Client Router  │  credentials: "include"       │  Express Auth   │
+│   (AuthStore)   │◄──────────────────────────────┤   Controller    │
+│                 │   200 OK + User / 401 Unauth  │                 │
+└────────┬────────┘                               └────────┬────────┘
+         │                                                 │
+         ▼                                                 ▼
+┌─────────────────┐                               ┌─────────────────┐
+│ Authenticated   │                               │  HTTP-Only      │
+│ App Shell View  │                               │  Cookie pd_auth │
+└─────────────────┘                               └─────────────────┘
+```
+
+- **Zero Client Token Storage**:
+  - The JWT is stored strictly in the HTTP-only, SameSite cookie (`pd_auth`).
+  - The frontend never reads, decodes, persists, or manipulates JWT tokens in `localStorage`, `sessionStorage`, or variables.
+- **Unified API Client ([`client/src/api/client.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/api/client.js))**:
+  - Native `fetch` wrapper with `credentials: "include"` and consistent JSON error normalization into `ApiError`.
+- **Reactive Auth Store ([`client/src/store/auth.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/store/auth.js))**:
+  - State: `status: "loading" | "authenticated" | "unauthenticated"`, `user: User | null`.
+  - Notifies subscribers on auth state transitions.
 
 ---
 
-## 3. Files Created / Modified
+## 2. Session Restoration & Route Guards
+
+- **Startup Sequence ([`client/src/main.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/main.js))**:
+  1. Boots into a serene ambient loading screen (avoiding any login page flicker).
+  2. Issues `GET /api/auth/me` with credentials.
+  3. If authenticated $\rightarrow$ updates `authStore.user` and renders `#app`.
+  4. If unauthenticated $\rightarrow$ renders `#login` (or `#register`).
+- **Route Protection ([`client/src/utils/router.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/utils/router.js))**:
+  - `#app` accessed while unauthenticated $\rightarrow$ automatically redirects to `#login`.
+  - `#login` or `#register` accessed while authenticated $\rightarrow$ automatically redirects to `#app`.
+
+---
+
+## 3. Connected Views & Micro-Interactions
+
+- **Login Page ([`client/src/views/LoginView.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/views/LoginView.js))**:
+  - Validates fields client-side.
+  - Submits `POST /api/auth/login`.
+  - Displays button loading spinner and prevents duplicate clicks.
+  - Handles `401` gracefully with `"Invalid email or password."`.
+  - "Remember Me" checkbox is visually disabled with an explanatory tooltip (`"1h session"`), avoiding false persistence guarantees.
+  - Google button indicates `"Coming soon"` without mock network requests.
+- **Register Page ([`client/src/views/RegisterView.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/views/RegisterView.js))**:
+  - Detects client timezone via `Intl.DateTimeFormat().resolvedOptions().timeZone`.
+  - Submits `POST /api/auth/register`.
+  - Handles `409` duplicate email conflict with clear messaging.
+  - Auto-authenticates and navigates to `#app` upon creation.
+- **Application Shell ([`client/src/views/AppShellView.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/views/AppShellView.js))**:
+  - Dynamically renders authenticated user's name and computed avatar initials (`AM`, `P`, etc.).
+  - "Sign out" button calls `authStore.logout()`, clears backend `pd_auth` cookie, and smoothly navigates back to `#login`.
+
+---
+
+## 4. Files Created / Modified
 
 - **Created:**
-  - `server/src/utils/password.js`: Bcrypt password hashing & comparison.
-  - `server/src/utils/token.js`: JWT creation, verification, cookie setting/clearing, and extraction.
-  - `server/src/schemas/auth.schema.js`: Zod validation schemas for `register` and `login`.
-  - `server/src/middleware/auth.js`: `requireAuth` protected route middleware.
-  - `server/src/services/auth.service.js`: Authentication business logic & database queries.
-  - `server/src/controllers/auth.controller.js`: HTTP handlers managing cookies and responses.
-  - `server/src/routes/auth.routes.js`: Route mappings and middleware chaining.
+  - [`client/src/api/client.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/api/client.js): Native `fetch` client with `credentials: "include"`.
+  - [`client/src/api/auth.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/api/auth.js): `authApi` service methods (`register`, `login`, `logout`, `getMe`).
+  - [`client/src/store/auth.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/store/auth.js): Reactive `AuthStore` single source of truth.
 - **Modified:**
-  - `server/package.json`: Added `bcrypt` and `jsonwebtoken`.
-  - `server/src/config/env.js`: Added validation for `JWT_SECRET` (min 32 chars) and `JWT_EXPIRES_IN`.
-  - `server/src/routes/index.js`: Mounted `/auth` routes under `/api/auth`.
-  - `server/.env.example`: Added `JWT_SECRET` and `JWT_EXPIRES_IN`.
-  - `PROJECT_CONTEXT.md`: Updated Phase status to Phase 4 complete.
-  - `README.md`: Documented authentication endpoints and environment variables.
+  - [`client/src/views/LoginView.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/views/LoginView.js): Real login integration, 401 handling, disabled Remember Me notice.
+  - [`client/src/views/RegisterView.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/views/RegisterView.js): Real registration integration, dynamic timezone, 409 handling.
+  - [`client/src/views/AppShellView.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/views/AppShellView.js): Dynamic user avatar/profile rendering, sign out button.
+  - [`client/src/utils/router.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/utils/router.js): Route protection guards and ambient loading state.
+  - [`client/src/main.js`](file:///d:/IGNORE/PROJECTS/PerfectDay/client/src/main.js): Bootstrap session restoration check.
+  - [`PROJECT_CONTEXT.md`](file:///d:/IGNORE/PROJECTS/PerfectDay/PROJECT_CONTEXT.md): Status updated to Phase 6 complete.
+  - [`README.md`](file:///d:/IGNORE/PROJECTS/PerfectDay/README.md): Status updated.
 
 ---
 
-## 4. Verification Results
+## 5. Verification Results
 
-| Test Case | Expected Result | Actual Result |
-| --- | --- | --- |
-| `GET /api/health` | `200 OK` | `200 OK` (Status: `ok`) |
-| `POST /api/auth/register` (Password < 8 chars) | `400 VALIDATION_ERROR` | `400 Bad Request` |
-| `POST /api/auth/register` (Valid payload) | `201 Created` + `pd_auth` cookie + default list | `201 Created` (Safe user profile, cookie set, "Tasks" list created) |
-| `POST /api/auth/register` (Duplicate email) | `409 CONFLICT` | `409 Conflict` ("Email is already registered") |
-| `POST /api/auth/login` (Wrong password) | `401 UNAUTHORIZED` | `401 Unauthorized` ("Invalid email or password") |
-| `POST /api/auth/login` (Non-existent user) | `401 UNAUTHORIZED` | `401 Unauthorized` ("Invalid email or password") |
-| `POST /api/auth/login` (Valid credentials) | `200 OK` + `pd_auth` cookie | `200 OK` (Email normalized, cookie set) |
-| `GET /api/auth/me` (With `pd_auth` cookie) | `200 OK` + safe user | `200 OK` (User object returned, no `passwordHash`) |
-| `GET /api/auth/me` (Without cookie) | `401 UNAUTHORIZED` | `401 Unauthorized` ("Authentication required") |
-| `POST /api/auth/logout` | `200 OK` + clear cookie | `200 OK` (`Set-Cookie: pd_auth=; Max-Age=0`) |
-| Client Build (`npm run build`) | `0 errors` | `0 errors` |
+| Test Case | Expected Result | Actual Result | Status |
+| :--- | :--- | :--- | :--- |
+| **Backend Health** | `GET /api/health` returns `200 OK` | `{"success":true,"data":{"status":"ok"}}` | **PASSED** |
+| **Registration Flow** | Creates user & sets `pd_auth` cookie | `201 Created` + User profile returned, cookie set | **PASSED** |
+| **Duplicate Email** | `409 Conflict` error returned | `409 Conflict` ("Email is already registered") | **PASSED** |
+| **Session Restoration** | `GET /api/auth/me` with cookie returns user | `200 OK` (User data restored without re-login) | **PASSED** |
+| **Unauthenticated Request** | `GET /api/auth/me` without cookie rejected | `401 Unauthorized` | **PASSED** |
+| **Invalid Login** | Wrong password rejected | `401 Unauthorized` ("Invalid email or password") | **PASSED** |
+| **Valid Login** | Correct password authenticates & sets cookie | `200 OK` + `pd_auth` cookie re-issued | **PASSED** |
+| **Logout Flow** | Clears `pd_auth` cookie | `200 OK` (`Set-Cookie: pd_auth=; Max-Age=0`) | **PASSED** |
+| **Production Build** | `npm run build` in `client/` | Built in 1.31s, 0 errors | **PASSED** |
+| **Zero Client Storage** | Tokens not in `localStorage`/`sessionStorage` | Confirmed zero auth tokens in browser storage | **PASSED** |
