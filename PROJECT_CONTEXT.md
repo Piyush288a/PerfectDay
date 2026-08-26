@@ -244,7 +244,7 @@ Required capabilities:
 | **10** | Subtasks, tags, reminders, recurring tasks, and calendar. |
 | **11** | Testing, security, accessibility, performance, responsive design, and production polish. |
 
-**Current phase:** 1 complete. Client (Vite) and server (Express) are initialized and independently runnable. Next: Phase 2 (database schema and Prisma) when requested.
+**Current phase:** 2 complete. Database schema, Prisma ORM, migrations, and PostgreSQL constraints are set up. Next: Phase 3 (backend foundation and REST API structure) when requested.
 
 ---
 

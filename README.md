@@ -2,13 +2,13 @@
 
 A modern personal productivity and to-do app: premium UI, REST API, and PostgreSQL. Inspired by Microsoft To Do and Google Tasks — not a copy of either.
 
-**Status:** Phase 1 — project initialized. Frontend (Vite) and backend (Express) run independently. No product features yet.
+**Status:** Phase 2 — database layer implemented. PostgreSQL schema and Prisma ORM are configured on the backend.
 
 ## Stack
 
 - **Frontend:** HTML, CSS, Vanilla JS, Vite (GSAP and Lucide later)
 - **Backend:** Node.js, Express, REST (`/api`)
-- **Data:** PostgreSQL, Prisma (Phase 2)
+- **Data:** PostgreSQL, Prisma ORM
 - **Auth:** JWT, bcrypt (Phase 4)
 
 The browser talks only to the API. The API talks to the database.
@@ -19,7 +19,7 @@ See [PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md) for product vision, architecture,
 
 ## Setup
 
-Requires [Node.js](https://nodejs.org/) 20 or later.
+Requires [Node.js](https://nodejs.org/) 20 or later and [PostgreSQL](https://www.postgresql.org/) 14 or later.
 
 ```bash
 # From the repository root
@@ -37,7 +37,31 @@ npm install
 
 On macOS or Linux, use `cp .env.example .env` instead of `copy`.
 
+Configure `DATABASE_URL` in `server/.env`:
+
+```env
+DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/perfectday?schema=public"
+```
+
 Do not commit `.env` files. They are gitignored. `.env.example` has no secrets.
+
+## Database Setup & Migrations
+
+Inside `server/`:
+
+```bash
+# Apply migrations to PostgreSQL
+npx prisma migrate deploy
+
+# (In development) Apply/create migrations
+npx prisma migrate dev
+
+# Generate Prisma Client
+npx prisma generate
+
+# Inspect the database with Prisma Studio
+npx prisma studio
+```
 
 ## Run
 
@@ -70,7 +94,6 @@ Expected response: `{"status":"ok"}`.
 ```
 PerfectDay/
   client/     Vite + Vanilla JS
-  server/     Node.js + Express
+  server/     Node.js + Express + Prisma ORM
 ```
 
-Phase 2 will add Prisma and the database schema. Do not add those yet.
