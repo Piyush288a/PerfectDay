@@ -2,7 +2,7 @@
 
 A modern personal productivity and to-do app: premium UI, REST API, and PostgreSQL. Inspired by Microsoft To Do and Google Tasks — not a copy of either.
 
-**Status:** Phase 6 — frontend authentication integrated. Client API client, reactive auth store, protected routing, session restoration, and real register/login/logout flows connected via HTTP-only cookies.
+**Status:** Phase 7A — backend core tasks & lists API implemented. Authenticated REST APIs for Lists and Tasks with strict user ownership enforcement, Zod validation, default list preservation, ON DELETE RESTRICT behavior, and My Day filtering.
 
 ## Stack
 
@@ -71,13 +71,26 @@ npx prisma studio
 ## API Endpoints
 
 ### Health Check
-- `GET /api/health` — Check server & database liveness
+- `GET /api/health` — Check server & database liveness (public)
 
 ### Authentication (`/api/auth`)
 - `POST /api/auth/register` — Register a new user & create default "Tasks" list (sets HTTP-only cookie `pd_auth`)
 - `POST /api/auth/login` — Authenticate user (sets HTTP-only cookie `pd_auth`)
 - `POST /api/auth/logout` — Logout user (clears `pd_auth` cookie)
-- `GET /api/auth/me` — Get currently authenticated user profile (protected by `pd_auth` cookie)
+- `GET /api/auth/me` — Get currently authenticated user profile (protected)
+
+### Lists (`/api/lists`)
+- `GET /api/lists` — Get all lists for authenticated user with task counts (protected)
+- `POST /api/lists` — Create a new custom list (protected)
+- `PATCH /api/lists/:id` — Rename custom list (protected, ownership-enforced)
+- `DELETE /api/lists/:id` — Delete custom list (protected, default list & non-empty list deletion rejected)
+
+### Tasks (`/api/tasks`)
+- `GET /api/tasks` — Get tasks with query filters (`listId`, `isCompleted`, `priority`, `myDay`, `due`, `search`, `sortBy`, `sortOrder`) (protected)
+- `POST /api/tasks` — Create a new task (auto-assigns to default list if `listId` omitted) (protected)
+- `GET /api/tasks/:id` — Get single task details with subtasks and list metadata (protected)
+- `PATCH /api/tasks/:id` — Update task fields / completion status / dates / priority (protected)
+- `DELETE /api/tasks/:id` — Delete task (protected, ownership-enforced)
 
 ## Run
 

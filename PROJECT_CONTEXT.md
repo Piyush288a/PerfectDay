@@ -244,7 +244,7 @@ Required capabilities:
 | **10** | Subtasks, tags, reminders, recurring tasks, and calendar. |
 | **11** | Testing, security, accessibility, performance, responsive design, and production polish. |
 
-**Current phase:** 6 complete. Frontend authentication integrated with backend REST API via HTTP-only cookies (`pd_auth`), reactive `authStore`, route guards, and startup session restoration. Next: Phase 7 (Dashboard UI) when requested.
+**Current phase:** 7A complete. Backend Core Tasks & Lists REST API implemented with authenticated ownership enforcement (`req.user.userId`), Zod validation schemas, default list preservation/protection, ON DELETE RESTRICT enforcement, My Day query filtering, and automated test suite. Next: Phase 7B (Frontend Task & List Integration).
 
 ---
 
