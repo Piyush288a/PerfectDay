@@ -244,13 +244,13 @@ Required capabilities:
 | **10** | Subtasks, tags, reminders, recurring tasks, and calendar. |
 | **11** | Testing, security, accessibility, performance, responsive design, and production polish. |
 
-**Current phase:** 2 complete. Database schema, Prisma ORM, migrations, and PostgreSQL constraints are set up. Next: Phase 3 (backend foundation and REST API structure) when requested.
+**Current phase:** 4 complete. Backend REST API foundation and JWT HTTP-only cookie authentication are implemented. Next: Phase 5 (Frontend design system) when requested.
 
 ---
 
 ## Finalized architectural decisions
 
-Recorded before Phase 1. Do not reopen these without discussion.
+Recorded before Phase 1 and updated through Phase 4. Do not reopen these without discussion.
 
 | Topic | Decision |
 | --- | --- |
@@ -259,7 +259,7 @@ Recorded before Phase 1. Do not reopen these without discussion.
 | Backend | Node.js + Express.js |
 | API | REST under `/api`; no versioning yet |
 | Database | PostgreSQL + Prisma |
-| Auth | JWT + bcrypt; **storage strategy later** (before Phase 4) |
+| Auth | JWT (1h lifetime, stored in HTTP-only cookie `pd_auth`, minimal payload `{ userId }`) + bcrypt (12 salt rounds); no refresh tokens |
 | Environment | `.env` for secrets; never commit `.env` |
 | Development | Frontend and backend run independently |
 | Deployment | Undecided; no deployment-specific work yet |
@@ -269,8 +269,6 @@ Recorded before Phase 1. Do not reopen these without discussion.
 
 Still to be decided later:
 
-- JWT token storage (httpOnly cookie vs localStorage vs memory + refresh, etc.) — **before Phase 4**
-- Exact Prisma data model (users, lists, tasks, tags, My Day semantics) — **Phase 2**
 - Deployment targets and production environment layout — **deferred**
 
 ---

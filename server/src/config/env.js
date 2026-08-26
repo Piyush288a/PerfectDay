@@ -7,6 +7,10 @@ const envSchema = z.object({
     .default("development"),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   CLIENT_ORIGIN: z.string().default("http://localhost:5173"),
+  JWT_SECRET: z
+    .string()
+    .min(32, "JWT_SECRET must be at least 32 characters long"),
+  JWT_EXPIRES_IN: z.string().default("1h"),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

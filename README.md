@@ -2,14 +2,14 @@
 
 A modern personal productivity and to-do app: premium UI, REST API, and PostgreSQL. Inspired by Microsoft To Do and Google Tasks — not a copy of either.
 
-**Status:** Phase 2 — database layer implemented. PostgreSQL schema and Prisma ORM are configured on the backend.
+**Status:** Phase 4 — authentication implemented. JWT-based HTTP-only cookie authentication, bcrypt password hashing, Zod validation, and protected routes are active.
 
 ## Stack
 
 - **Frontend:** HTML, CSS, Vanilla JS, Vite (GSAP and Lucide later)
 - **Backend:** Node.js, Express, REST (`/api`)
 - **Data:** PostgreSQL, Prisma ORM
-- **Auth:** JWT, bcrypt (Phase 4)
+- **Auth:** JWT (HTTP-only cookies), bcrypt
 
 The browser talks only to the API. The API talks to the database.
 
@@ -37,10 +37,15 @@ npm install
 
 On macOS or Linux, use `cp .env.example .env` instead of `copy`.
 
-Configure `DATABASE_URL` in `server/.env`:
+Configure environment variables in `server/.env`:
 
 ```env
+PORT=3000
+NODE_ENV=development
 DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/perfectday?schema=public"
+CLIENT_ORIGIN=http://localhost:5173
+JWT_SECRET="your-super-secret-jwt-key-min-32-characters"
+JWT_EXPIRES_IN=1h
 ```
 
 Do not commit `.env` files. They are gitignored. `.env.example` has no secrets.
@@ -63,6 +68,17 @@ npx prisma generate
 npx prisma studio
 ```
 
+## API Endpoints
+
+### Health Check
+- `GET /api/health` — Check server & database liveness
+
+### Authentication (`/api/auth`)
+- `POST /api/auth/register` — Register a new user & create default "Tasks" list (sets HTTP-only cookie `pd_auth`)
+- `POST /api/auth/login` — Authenticate user (sets HTTP-only cookie `pd_auth`)
+- `POST /api/auth/logout` — Logout user (clears `pd_auth` cookie)
+- `GET /api/auth/me` — Get currently authenticated user profile (protected by `pd_auth` cookie)
+
 ## Run
 
 Use two terminals. Each app starts on its own.
@@ -81,14 +97,6 @@ cd server
 npm run dev
 ```
 
-Health check:
-
-```bash
-curl http://localhost:3000/api/health
-```
-
-Expected response: `{"status":"ok"}`.
-
 ## Layout
 
 ```
@@ -96,4 +104,5 @@ PerfectDay/
   client/     Vite + Vanilla JS
   server/     Node.js + Express + Prisma ORM
 ```
+
 
