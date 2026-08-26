@@ -1,12 +1,6 @@
-import express from "express";
+import app from "./app.js";
+import { env } from "./config/env.js";
 
-const app = express();
-const port = Number(process.env.PORT) || 3000;
-
-app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok" });
-});
-
-app.listen(port, () => {
-  console.log(`PerfectDay server listening on http://localhost:${port}`);
+app.listen(env.PORT, () => {
+  console.log(`PerfectDay server listening on http://localhost:${env.PORT}`);
 });
