@@ -1,0 +1,145 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum TaskPriority {
+  NONE
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum RecurrenceRule {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String     @unique
+  passwordHash String
+  displayName  String?
+  timezone     String     @default("UTC")
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  lists        List[]
+  tasks        Task[]
+  subtasks     Subtask[]
+  tags         Tag[]
+  taskTags     TaskTag[]
+  reminders    Reminder[]
+}
+
+model List {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  name      String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+
+  @@index([userId])
+}
+
+model Task {
+  id                 String         @id @default(uuid()) @db.Uuid
+  userId             String         @db.Uuid
+  listId             String         @db.Uuid
+  title              String
+  notes              String?
+  isCompleted        Boolean        @default(false)
+  completedAt        DateTime?
+  dueDate            DateTime?      @db.Date
+  myDayOn            DateTime?      @db.Date
+  priority           TaskPriority   @default(NONE)
+  order              Int            @default(0)
+  recurrenceRule     RecurrenceRule @default(NONE)
+  recurrenceInterval Int            @default(1)
+  recurrenceEndsOn   DateTime?      @db.Date
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  list               List           @relation(fields: [listId], references: [id], onDelete: Restrict)
+  subtasks           Subtask[]
+  taskTags           TaskTag[]
+  reminder           Reminder?
+
+  @@index([userId, listId, order])
+  @@index([userId, isCompleted, dueDate])
+  @@index([userId, myDayOn])
+  @@index([userId, dueDate])
+}
+
+model Subtask {
+  id          String    @id @default(uuid()) @db.Uuid
+  taskId      String    @db.Uuid
+  userId      String    @db.Uuid
+  title       String
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, order])
+  @@index([userId])
+}
+
+model Tag {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  name      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskTags  TaskTag[]
+
+  @@unique([userId, name])
+  @@index([userId, name])
+}
+
+model TaskTag {
+  taskId    String   @db.Uuid
+  tagId     String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, tagId])
+  @@index([tagId])
+  @@index([userId])
+}
+
+model Reminder {
+  id        String   @id @default(uuid()) @db.Uuid
+  taskId    String   @unique @db.Uuid
+  userId    String   @db.Uuid
+  remindAt  DateTime
+  isSent    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isSent, remindAt])
+}
