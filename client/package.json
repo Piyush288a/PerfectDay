@@ -1,7 +1,7 @@
 {
   "name": "perfectday-client",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.7.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,9 +9,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "lucide": "^0.475.0"
+    "lucide": "^0.468.0"
   },
   "devDependencies": {
-    "vite": "^6.3.5"
+    "jsdom": "^30.0.1",
+    "vite": "^6.0.0"
   }
 }

@@ -74,7 +74,7 @@ export const getTasksQuerySchema = z.object({
     .enum(["true", "false"])
     .transform((val) => val === "true")
     .optional(),
-  due: z.enum(["today", "upcoming", "overdue"]).optional(),
+  due: z.enum(["today", "upcoming", "overdue", "planned"]).optional(),
   search: z.string().trim().optional(),
   sortBy: z.enum(["order", "dueDate", "priority", "title", "createdAt"]).default("order"),
   sortOrder: z.enum(["asc", "desc"]).default("asc"),

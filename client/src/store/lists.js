@@ -14,6 +14,15 @@ class ListStore {
     return { ...this.state };
   }
 
+  reset() {
+    this.state = {
+      lists: [],
+      loading: false,
+      error: null,
+    };
+    this.notify();
+  }
+
   getDefaultList() {
     return this.state.lists.find((l) => l.isDefault === true) || null;
   }
@@ -45,9 +54,42 @@ class ListStore {
   }
 
   async updateList(id, name) {
-    const updated = await listsApi.updateList(id, { name });
-    await this.fetchLists(); // Reconcile with server
-    return updated;
+    const listIndex = this.state.lists.findIndex((l) => l.id === id);
+    const originalList = listIndex !== -1 ? { ...this.state.lists[listIndex] } : null;
+    const trimmedName = name ? name.trim() : "";
+
+    if (!trimmedName) {
+      throw new Error("List name cannot be empty");
+    }
+
+    // 1. Immediate optimistic UI update
+    if (listIndex !== -1) {
+      this.state.lists[listIndex] = {
+        ...this.state.lists[listIndex],
+        name: trimmedName,
+      };
+      this.notify();
+    }
+
+    try {
+      // 2. Background API request
+      const updated = await listsApi.updateList(id, { name: trimmedName });
+      if (listIndex !== -1) {
+        this.state.lists[listIndex] = {
+          ...this.state.lists[listIndex],
+          ...updated,
+        };
+      }
+      this.notify();
+      return updated;
+    } catch (err) {
+      // 3. Rollback on failure
+      if (originalList && listIndex !== -1) {
+        this.state.lists[listIndex] = originalList;
+        this.notify();
+      }
+      throw err;
+    }
   }
 
   async deleteList(id) {

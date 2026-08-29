@@ -1,121 +1,65 @@
 # PerfectDay
 
-A modern personal productivity and to-do app: premium UI, REST API, and PostgreSQL. Inspired by Microsoft To Do and Google Tasks — not a copy of either.
+A modern personal productivity and to-do application: Apple-inspired glassmorphism UI, REST API, and PostgreSQL. Inspired by Microsoft To Do and Google Tasks — not a copy of either.
 
-**Status:** Phase 7C — task interaction & productivity UX complete. Responsive Slide-Over Task Detail Panel (right drawer), debounced autosave for title/notes (500ms), native datepicker with quick chips, 4-tier priority selector, list moving, My Day assignment (`myDayOn`), accessible delete confirmation modal, and full keyboard/mobile accessibility active.
+**Status:** **Phase 7.9.5 Complete** — Final Fix: True Fixed App Chrome (Fixed Top/Nav/Composer Chrome, Strict Viewport Isolation, Independent Planned Horizontal Board, Natural Column Heights).
+
+---
+
+## Highlights of Phase 7.9.5
+- **True Fixed App Chrome**: Left navigation rail, workspace header, and bottom Add Task composer remain strictly fixed to their respective viewport anchors during deep vertical or horizontal scrolling.
+- **Independent Planned Horizontal Viewport**: Horizontal scrolling affects ONLY the date/task board; workspace header, description, sidebar, and bottom composer stay completely stationary.
+- **Independent Natural Column Heights**: Planned date columns size dynamically based on their individual task counts (`align-items: flex-start`), avoiding stretched or artificial heights.
+- **Single-Line Glass Title Input**: Sleek single-line glass input without resize handles, with debounced autosave and focus retention.
+- **Minimal Apple-Inspired Scrollbars**: Clean, subtle glass scrollbar thumbs with native white scrollbar tracks completely eliminated.
+- **Optimistic Custom List Rename**: Instant local UI update with automatic rollback on network failure.
+- **Apple-Inspired Glassmorphism**: Translucent frosted surfaces with layered depth, high-contrast readable typography, subtle borders, and warm amber accents.
+
+---
 
 ## Stack
 
-- **Frontend:** HTML5, CSS3 Custom Properties, Vanilla JavaScript, Vite, Lucide Icons
-- **Backend:** Node.js, Express, REST (`/api`)
+- **Frontend:** HTML5, CSS3 Custom Properties, Vanilla JavaScript (ES Modules), Vite, Lucide Icons
+- **Backend:** Node.js, Express 5, REST (`/api`), Zod Validation
 - **Data:** PostgreSQL, Prisma ORM
-- **Auth:** JWT (HTTP-only cookies), bcrypt
+- **Auth:** JWT (HTTP-only secure cookies `pd_auth`), bcrypt
 
-The browser talks only to the API. The API talks to the database.
+The browser communicates exclusively with the REST API. The API communicates with the database.
 
-## Docs
+---
 
-See [PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md) for product vision, architecture, UI direction, development rules, and phases.
+## Setup & Running
 
-## Setup
+### Prerequisites
+- Node.js >= 20.x
+- PostgreSQL database running locally or remotely
 
-Requires [Node.js](https://nodejs.org/) 20 or later and [PostgreSQL](https://www.postgresql.org/) 14 or later.
-
+### Backend Setup
 ```bash
-# From the repository root
-
-# Frontend
-cd client
-copy .env.example .env
-npm install
-
-# Backend (new terminal)
 cd server
-copy .env.example .env
 npm install
-```
-
-On macOS or Linux, use `cp .env.example .env` instead of `copy`.
-
-Configure environment variables in `server/.env`:
-
-```env
-PORT=3000
-NODE_ENV=development
-DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/perfectday?schema=public"
-CLIENT_ORIGIN=http://localhost:5173
-JWT_SECRET="your-super-secret-jwt-key-min-32-characters"
-JWT_EXPIRES_IN=1h
-```
-
-Do not commit `.env` files. They are gitignored. `.env.example` has no secrets.
-
-## Database Setup & Migrations
-
-Inside `server/`:
-
-```bash
-# Apply migrations to PostgreSQL
-npx prisma migrate deploy
-
-# (In development) Apply/create migrations
+cp .env.example .env # Configure DATABASE_URL and JWT_SECRET
 npx prisma migrate dev
-
-# Generate Prisma Client
-npx prisma generate
-
-# Inspect the database with Prisma Studio
-npx prisma studio
+npm run start
 ```
 
-## API Endpoints
-
-### Health Check
-- `GET /api/health` — Check server & database liveness (public)
-
-### Authentication (`/api/auth`)
-- `POST /api/auth/register` — Register a new user & create default "Tasks" list (sets HTTP-only cookie `pd_auth`)
-- `POST /api/auth/login` — Authenticate user (sets HTTP-only cookie `pd_auth`)
-- `POST /api/auth/logout` — Logout user (clears `pd_auth` cookie)
-- `GET /api/auth/me` — Get currently authenticated user profile (protected)
-
-### Lists (`/api/lists`)
-- `GET /api/lists` — Get all lists for authenticated user with task counts (protected)
-- `POST /api/lists` — Create a new custom list (protected)
-- `PATCH /api/lists/:id` — Rename custom list (protected, ownership-enforced)
-- `DELETE /api/lists/:id` — Delete custom list (protected, default list & non-empty list deletion rejected)
-
-### Tasks (`/api/tasks`)
-- `GET /api/tasks` — Get tasks with query filters (`listId`, `isCompleted`, `priority`, `myDay`, `due`, `search`, `sortBy`, `sortOrder`) (protected)
-- `POST /api/tasks` — Create a new task (auto-assigns to default list if `listId` omitted) (protected)
-- `GET /api/tasks/:id` — Get single task details with subtasks and list metadata (protected)
-- `PATCH /api/tasks/:id` — Update task fields / completion status / dates / priority (protected)
-- `DELETE /api/tasks/:id` — Delete task (protected, ownership-enforced)
-
-## Run
-
-Use two terminals. Each app starts on its own.
-
-**Client** (http://localhost:5173):
-
+### Frontend Setup
 ```bash
 cd client
-npm run dev
+npm install
+npm run dev # Starts Vite dev server on http://localhost:5173
+npm run build # Production bundle verification
 ```
 
-**Server** (http://localhost:3000):
+---
 
-```bash
-cd server
-npm run dev
-```
+## Verification Test Suites
 
-## Layout
+### Automated Test Suites (98/98 Tests Passed)
+- Phase 7A Backend API Suite: `node scratch/test_phase7a.js` (26 tests)
+- Phase 7B Frontend Integration Suite: `node scratch/test_phase7b.js` (25 tests)
+- Phase 7C Task Interaction Suite: `node scratch/test_phase7c.js` (19 tests)
+- Phase 7.5 Security & Regression Suite: `node scratch/test_phase7_5.js` (28 tests)
 
-```
-PerfectDay/
-  client/     Vite + Vanilla JS
-  server/     Node.js + Express + Prisma ORM
-```
-
-
+### Browser & UI Acceptance Suite (60/60 Tests Passed)
+- Full Browser & DOM Acceptance Suite: `node client/test_browser_acceptance.js` (60 tests)

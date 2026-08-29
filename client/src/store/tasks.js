@@ -21,10 +21,47 @@ class TaskStore {
     return { ...this.state };
   }
 
+  reset() {
+    // Cancel all active debounce timers
+    this.saveTimers.forEach((timer) => clearTimeout(timer));
+    this.saveTimers.clear();
+    this.activeSaveVersion.clear();
+    this.activeRequestId++; // Invalidate any pending API responses
+
+    this.state = {
+      currentView: "my-day",
+      tasks: [],
+      selectedTaskId: null,
+      selectedTask: null,
+      loading: false,
+      error: null,
+    };
+    this.notify();
+  }
+
   setView(view) {
     if (this.state.currentView === view) return;
     this.state.currentView = view;
     this.fetchTasks();
+  }
+
+  _taskMatchesCurrentView(task) {
+    if (!task) return false;
+    const view = this.state.currentView;
+    if (view === "my-day") {
+      return Boolean(task.myDayOn);
+    }
+    if (view === "important") {
+      return task.priority === "HIGH";
+    }
+    if (view === "planned") {
+      return Boolean(task.dueDate) || Boolean(task.myDayOn);
+    }
+    if (view === "all-tasks") {
+      return true;
+    }
+    // Custom List ID
+    return task.listId === view;
   }
 
   async selectTask(id) {
@@ -46,11 +83,15 @@ class TaskStore {
     // Only fetch if missing from local state
     try {
       const task = await tasksApi.getTask(id);
-      this.state.selectedTask = task;
+      if (this.state.selectedTaskId === id) {
+        this.state.selectedTask = task;
+      }
     } catch (err) {
       console.error("TaskStore selectTask error:", err);
-      this.state.selectedTaskId = null;
-      this.state.selectedTask = null;
+      if (this.state.selectedTaskId === id) {
+        this.state.selectedTaskId = null;
+        this.state.selectedTask = null;
+      }
     } finally {
       this.notify();
     }
@@ -80,7 +121,7 @@ class TaskStore {
       query.sortBy = "createdAt";
       query.sortOrder = "desc";
     } else if (view === "planned") {
-      query.due = "upcoming";
+      query.due = "planned";
       query.sortBy = "dueDate";
       query.sortOrder = "asc";
     } else if (view === "all-tasks") {
@@ -100,7 +141,9 @@ class TaskStore {
         // Keep selectedTask synchronized if opened
         if (this.state.selectedTaskId) {
           const matching = this.state.tasks.find((t) => t.id === this.state.selectedTaskId);
-          if (matching) this.state.selectedTask = { ...matching };
+          if (matching) {
+            this.state.selectedTask = { ...matching };
+          }
         }
         this.state.error = null;
       }
@@ -126,9 +169,9 @@ class TaskStore {
 
   async toggleComplete(id) {
     const taskIndex = this.state.tasks.findIndex((t) => t.id === id);
-    if (taskIndex === -1) return;
+    const originalTask = taskIndex !== -1 ? { ...this.state.tasks[taskIndex] } : this.state.selectedTask ? { ...this.state.selectedTask } : null;
+    if (!originalTask) return;
 
-    const originalTask = { ...this.state.tasks[taskIndex] };
     const nextCompleted = !originalTask.isCompleted;
 
     // Optimistic update
@@ -138,7 +181,9 @@ class TaskStore {
       completedAt: nextCompleted ? new Date().toISOString() : null,
     };
 
-    this.state.tasks[taskIndex] = updatedLocal;
+    if (taskIndex !== -1) {
+      this.state.tasks[taskIndex] = updatedLocal;
+    }
     if (this.state.selectedTaskId === id) {
       this.state.selectedTask = { ...updatedLocal };
     }
@@ -146,7 +191,9 @@ class TaskStore {
 
     try {
       const updated = await tasksApi.updateTask(id, { isCompleted: nextCompleted });
-      this.state.tasks[taskIndex] = updated;
+      if (taskIndex !== -1) {
+        this.state.tasks[taskIndex] = updated;
+      }
       if (this.state.selectedTaskId === id) {
         this.state.selectedTask = { ...updated };
       }
@@ -155,7 +202,9 @@ class TaskStore {
       return updated;
     } catch (err) {
       // Rollback on failure
-      this.state.tasks[taskIndex] = originalTask;
+      if (taskIndex !== -1) {
+        this.state.tasks[taskIndex] = originalTask;
+      }
       if (this.state.selectedTaskId === id) {
         this.state.selectedTask = { ...originalTask };
       }
@@ -166,9 +215,9 @@ class TaskStore {
 
   async togglePriority(id) {
     const taskIndex = this.state.tasks.findIndex((t) => t.id === id);
-    if (taskIndex === -1) return;
+    const originalTask = taskIndex !== -1 ? { ...this.state.tasks[taskIndex] } : this.state.selectedTask ? { ...this.state.selectedTask } : null;
+    if (!originalTask) return;
 
-    const originalTask = { ...this.state.tasks[taskIndex] };
     const nextPriority = originalTask.priority === "HIGH" ? "NONE" : "HIGH";
 
     // Optimistic update
@@ -177,7 +226,13 @@ class TaskStore {
       priority: nextPriority,
     };
 
-    this.state.tasks[taskIndex] = updatedLocal;
+    if (taskIndex !== -1) {
+      if (!this._taskMatchesCurrentView(updatedLocal)) {
+        this.state.tasks.splice(taskIndex, 1);
+      } else {
+        this.state.tasks[taskIndex] = updatedLocal;
+      }
+    }
     if (this.state.selectedTaskId === id) {
       this.state.selectedTask = { ...updatedLocal };
     }
@@ -185,7 +240,16 @@ class TaskStore {
 
     try {
       const updated = await tasksApi.updateTask(id, { priority: nextPriority });
-      this.state.tasks[taskIndex] = updated;
+      const currentIdx = this.state.tasks.findIndex((t) => t.id === id);
+      if (this._taskMatchesCurrentView(updated)) {
+        if (currentIdx !== -1) {
+          this.state.tasks[currentIdx] = updated;
+        } else {
+          this.state.tasks.push(updated);
+        }
+      } else if (currentIdx !== -1) {
+        this.state.tasks.splice(currentIdx, 1);
+      }
       if (this.state.selectedTaskId === id) {
         this.state.selectedTask = { ...updated };
       }
@@ -193,7 +257,9 @@ class TaskStore {
       return updated;
     } catch (err) {
       // Rollback on failure
-      this.state.tasks[taskIndex] = originalTask;
+      if (taskIndex !== -1) {
+        this.state.tasks[taskIndex] = originalTask;
+      }
       if (this.state.selectedTaskId === id) {
         this.state.selectedTask = { ...originalTask };
       }
@@ -204,41 +270,79 @@ class TaskStore {
 
   async updateTask(id, data) {
     const taskIndex = this.state.tasks.findIndex((t) => t.id === id);
-    if (taskIndex !== -1) {
-      this.state.tasks[taskIndex] = {
-        ...this.state.tasks[taskIndex],
-        ...data,
-      };
+    const originalTask = taskIndex !== -1 ? { ...this.state.tasks[taskIndex] } : this.state.selectedTask ? { ...this.state.selectedTask } : null;
+
+    if (originalTask) {
+      const updatedLocal = { ...originalTask, ...data };
+      if (taskIndex !== -1) {
+        if (!this._taskMatchesCurrentView(updatedLocal)) {
+          this.state.tasks.splice(taskIndex, 1);
+        } else {
+          this.state.tasks[taskIndex] = updatedLocal;
+        }
+      }
       if (this.state.selectedTaskId === id) {
-        this.state.selectedTask = { ...this.state.tasks[taskIndex] };
+        this.state.selectedTask = { ...updatedLocal };
       }
       this.notify();
     }
 
-    const updated = await tasksApi.updateTask(id, data);
-    if (taskIndex !== -1) {
-      this.state.tasks[taskIndex] = updated;
+    try {
+      const updated = await tasksApi.updateTask(id, data);
+      const currentIdx = this.state.tasks.findIndex((t) => t.id === id);
+      if (this._taskMatchesCurrentView(updated)) {
+        if (currentIdx !== -1) {
+          this.state.tasks[currentIdx] = updated;
+        } else {
+          this.state.tasks.push(updated);
+        }
+      } else if (currentIdx !== -1) {
+        this.state.tasks.splice(currentIdx, 1);
+      }
+
+      if (this.state.selectedTaskId === id) {
+        this.state.selectedTask = { ...updated };
+      }
+      this.notify();
+      listStore.fetchLists(); // Reconcile list counts
+      return updated;
+    } catch (err) {
+      // Rollback on failure
+      if (originalTask) {
+        if (taskIndex !== -1) {
+          const idx = this.state.tasks.findIndex((t) => t.id === id);
+          if (idx !== -1) {
+            this.state.tasks[idx] = originalTask;
+          } else {
+            this.state.tasks.splice(taskIndex, 0, originalTask);
+          }
+        }
+        if (this.state.selectedTaskId === id) {
+          this.state.selectedTask = { ...originalTask };
+        }
+        this.notify();
+      }
+      throw err;
     }
-    if (this.state.selectedTaskId === id) {
-      this.state.selectedTask = { ...updated };
-    }
-    this.notify();
-    listStore.fetchLists(); // Reconcile list counts
-    return updated;
   }
 
   debouncedUpdateTask(id, data, delay = 500) {
     const taskIndex = this.state.tasks.findIndex((t) => t.id === id);
     if (taskIndex !== -1) {
-      this.state.tasks[taskIndex] = {
-        ...this.state.tasks[taskIndex],
+      const updatedLocal = { ...this.state.tasks[taskIndex], ...data };
+      if (!this._taskMatchesCurrentView(updatedLocal)) {
+        this.state.tasks.splice(taskIndex, 1);
+      } else {
+        this.state.tasks[taskIndex] = updatedLocal;
+      }
+    }
+    if (this.state.selectedTaskId === id) {
+      this.state.selectedTask = {
+        ...(this.state.selectedTask || {}),
         ...data,
       };
-      if (this.state.selectedTaskId === id) {
-        this.state.selectedTask = { ...this.state.tasks[taskIndex] };
-      }
-      this.notify();
     }
+    // Update store state quietly for debounced text without forcing destructive DOM re-renders
 
     const currentVersion = (this.activeSaveVersion.get(id) || 0) + 1;
     this.activeSaveVersion.set(id, currentVersion);
@@ -255,8 +359,14 @@ class TaskStore {
           // Check if a newer debounced update was dispatched
           if (this.activeSaveVersion.get(id) === currentVersion) {
             const idx = this.state.tasks.findIndex((t) => t.id === id);
-            if (idx !== -1) {
-              this.state.tasks[idx] = updated;
+            if (this._taskMatchesCurrentView(updated)) {
+              if (idx !== -1) {
+                this.state.tasks[idx] = updated;
+              } else {
+                this.state.tasks.push(updated);
+              }
+            } else if (idx !== -1) {
+              this.state.tasks.splice(idx, 1);
             }
             if (this.state.selectedTaskId === id) {
               this.state.selectedTask = { ...updated };

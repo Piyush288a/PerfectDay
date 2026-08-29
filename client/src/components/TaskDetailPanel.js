@@ -2,19 +2,38 @@ import { taskStore } from "../store/tasks.js";
 import { listStore } from "../store/lists.js";
 import { showConfirmModal } from "./Modal.js";
 import { showToast } from "./Toast.js";
+import { showDatePicker, closeDatePicker } from "./DatePicker.js";
 import { initIcons } from "../utils/icons.js";
 
 export const renderTaskDetailPanelHTML = (task, lists = []) => {
   if (!task) return "";
 
   const isCompleted = Boolean(task.isCompleted);
-  const isHighPriority = task.priority === "HIGH";
   const inMyDay = Boolean(task.myDayOn);
 
-  // Due date value in YYYY-MM-DD format for native date input
-  let dueDateVal = "";
+  // Format due date for display
+  let dueDateText = "Set due date";
+  let isOverdue = false;
+  let isToday = false;
+
   if (task.dueDate) {
-    dueDateVal = new Date(task.dueDate).toISOString().split("T")[0];
+    const d = new Date(task.dueDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const checkDate = new Date(d);
+    checkDate.setHours(0, 0, 0, 0);
+
+    const formatted = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    if (checkDate.getTime() === today.getTime()) {
+      dueDateText = "Today";
+      isToday = true;
+    } else if (checkDate.getTime() < today.getTime() && !isCompleted) {
+      dueDateText = `Overdue: ${formatted}`;
+      isOverdue = true;
+    } else {
+      dueDateText = formatted;
+    }
   }
 
   // Format created at
@@ -38,7 +57,7 @@ export const renderTaskDetailPanelHTML = (task, lists = []) => {
           >
             <i data-lucide="${isCompleted ? "check" : "circle"}" style="width: 20px; height: 20px;"></i>
           </button>
-          <span style="font-size: var(--text-xs); color: var(--color-text-muted);">
+          <span style="font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 500;">
             ${isCompleted ? "Completed" : "Active task"}
           </span>
         </div>
@@ -56,15 +75,17 @@ export const renderTaskDetailPanelHTML = (task, lists = []) => {
 
       <!-- Scrollable Body -->
       <div class="detail-body">
-        <!-- Title Input -->
-        <div class="detail-section">
-          <textarea 
+        <!-- Title Input (Single-Line Glass Input) -->
+        <div class="detail-section detail-title-wrap">
+          <input 
+            type="text" 
             class="detail-title-input" 
             id="detail-title-input" 
-            rows="1" 
+            value="${escapeHTML(task.title)}" 
             placeholder="Task title..." 
             aria-label="Task title"
-          >${escapeHTML(task.title)}</textarea>
+            autocomplete="off"
+          />
         </div>
 
         <!-- My Day Quick Action -->
@@ -82,28 +103,25 @@ export const renderTaskDetailPanelHTML = (task, lists = []) => {
           </button>
         </div>
 
-        <!-- Due Date Section -->
+        <!-- Graphical Due Date Section -->
         <div class="detail-card-section">
           <div class="detail-field-label">
             <i data-lucide="calendar" style="width: 14px; height: 14px;"></i>
             <span>Due Date</span>
           </div>
 
-          <div style="display: flex; flex-direction: column; gap: var(--space-2);">
-            <input 
-              type="date" 
-              class="detail-date-input" 
-              id="detail-due-date-input" 
-              value="${dueDateVal}" 
-              aria-label="Due date"
-            />
-
-            <div class="detail-chips-row">
-              <button type="button" class="detail-chip" data-date-chip="today">Today</button>
-              <button type="button" class="detail-chip" data-date-chip="tomorrow">Tomorrow</button>
-              ${dueDateVal ? `<button type="button" class="detail-chip clear-chip" data-date-chip="clear">Clear</button>` : ""}
+          <button 
+            type="button" 
+            class="detail-date-trigger-btn ${task.dueDate ? "has-date" : ""} ${isOverdue ? "overdue" : ""} ${isToday ? "today" : ""}" 
+            id="detail-date-picker-btn"
+            aria-label="Change due date"
+          >
+            <div style="display: flex; align-items: center; gap: var(--space-2);">
+              <i data-lucide="calendar" style="width: 15px; height: 15px;"></i>
+              <span id="detail-date-display-text">${escapeHTML(dueDateText)}</span>
             </div>
-          </div>
+            <i data-lucide="chevron-down" style="width: 14px; height: 14px; opacity: 0.7;"></i>
+          </button>
         </div>
 
         <!-- Priority Selector -->
@@ -150,7 +168,7 @@ export const renderTaskDetailPanelHTML = (task, lists = []) => {
           </select>
         </div>
 
-        <!-- Notes Section -->
+        <!-- Notes Section (Multi-character Continuous Editing) -->
         <div class="detail-card-section">
           <div class="detail-field-label">
             <i data-lucide="file-text" style="width: 14px; height: 14px;"></i>
@@ -198,31 +216,30 @@ export const initTaskDetailPanelEvents = (panelEl) => {
   const closeBtn = panelEl.querySelector("#detail-close-btn");
   if (closeBtn) {
     closeBtn.addEventListener("click", () => {
+      closeDatePicker();
       taskStore.closeDetail();
     });
   }
 
-  // 2. Title Input (Auto-grow & Debounced save)
+  // 2. Title Input (Single-line Debounced save & Enter key support)
   const titleInput = panelEl.querySelector("#detail-title-input");
   if (titleInput) {
-    const autoGrow = () => {
-      titleInput.style.height = "auto";
-      titleInput.style.height = `${titleInput.scrollHeight}px`;
-    };
-    autoGrow();
-
     titleInput.addEventListener("input", () => {
-      autoGrow();
-      const val = titleInput.value.trim();
-      if (val) {
-        taskStore.debouncedUpdateTask(taskId, { title: val }, 500);
-      }
+      const val = titleInput.value;
+      taskStore.debouncedUpdateTask(taskId, { title: val }, 500);
     });
 
     titleInput.addEventListener("blur", () => {
-      const val = titleInput.value.trim();
-      if (val) {
+      const val = titleInput.value;
+      if (val.trim()) {
         taskStore.updateTask(taskId, { title: val });
+      }
+    });
+
+    titleInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        titleInput.blur();
       }
     });
   }
@@ -259,41 +276,34 @@ export const initTaskDetailPanelEvents = (panelEl) => {
     });
   }
 
-  // 5. Due Date Input & Quick Chips
-  const dateInput = panelEl.querySelector("#detail-due-date-input");
-  if (dateInput) {
-    dateInput.addEventListener("change", async () => {
-      const val = dateInput.value ? dateInput.value : null;
-      try {
-        await taskStore.updateTask(taskId, { dueDate: val });
-      } catch (err) {
-        showToast({ message: err.message || "Failed to update due date.", type: "error" });
-      }
+  // 5. Graphical Date Picker Trigger
+  const dateBtn = panelEl.querySelector("#detail-date-picker-btn");
+  if (dateBtn) {
+    dateBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const { selectedTask } = taskStore.getState();
+      showDatePicker({
+        anchorEl: dateBtn,
+        currentDate: selectedTask?.dueDate || null,
+        onSelect: async (selectedISO) => {
+          try {
+            await taskStore.updateTask(taskId, { dueDate: selectedISO });
+            showToast({ message: `Due date set to ${selectedISO}`, type: "info" });
+          } catch (err) {
+            showToast({ message: err.message || "Failed to update due date.", type: "error" });
+          }
+        },
+        onClear: async () => {
+          try {
+            await taskStore.updateTask(taskId, { dueDate: null });
+            showToast({ message: "Due date cleared.", type: "info" });
+          } catch (err) {
+            showToast({ message: err.message || "Failed to clear due date.", type: "error" });
+          }
+        },
+      });
     });
   }
-
-  const dateChips = panelEl.querySelectorAll("[data-date-chip]");
-  dateChips.forEach((chip) => {
-    chip.addEventListener("click", async () => {
-      const action = chip.dataset.dateChip;
-      let targetDate = null;
-
-      if (action === "today") {
-        targetDate = new Date().toISOString().split("T")[0];
-      } else if (action === "tomorrow") {
-        targetDate = new Date(Date.now() + 86400000).toISOString().split("T")[0];
-      } else if (action === "clear") {
-        targetDate = null;
-      }
-
-      if (dateInput) dateInput.value = targetDate || "";
-      try {
-        await taskStore.updateTask(taskId, { dueDate: targetDate });
-      } catch (err) {
-        showToast({ message: err.message || "Failed to update due date.", type: "error" });
-      }
-    });
-  });
 
   // 6. Priority Selector
   const priorityChips = panelEl.querySelectorAll("[data-priority]");
@@ -322,7 +332,7 @@ export const initTaskDetailPanelEvents = (panelEl) => {
     });
   }
 
-  // 8. Notes Textarea (Debounced save & auto-grow)
+  // 8. Notes Textarea (Continuous Multi-character Editing with 500ms Debounce)
   const notesInput = panelEl.querySelector("#detail-notes-input");
   if (notesInput) {
     const autoGrowNotes = () => {

@@ -29,10 +29,15 @@ export const getUserTasks = async (userId, filters = {}) => {
     if (filters.due === "today") {
       where.dueDate = today;
     } else if (filters.due === "upcoming") {
-      where.dueDate = { gt: today };
+      where.dueDate = { gte: today };
     } else if (filters.due === "overdue") {
       where.dueDate = { lt: today };
       where.isCompleted = false;
+    } else if (filters.due === "planned") {
+      where.OR = [
+        { dueDate: { not: null } },
+        { myDayOn: { not: null } },
+      ];
     }
   }
 

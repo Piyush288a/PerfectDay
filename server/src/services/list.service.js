@@ -37,6 +37,10 @@ export const updateList = async (userId, listId, { name }) => {
     throw new NotFoundError("List not found");
   }
 
+  if (existingList.isDefault) {
+    throw new BadRequestError("Default list cannot be renamed");
+  }
+
   return prisma.list.update({
     where: { id: listId },
     data: { name },

@@ -1,4 +1,6 @@
 import { authApi } from "../api/auth.js";
+import { taskStore } from "./tasks.js";
+import { listStore } from "./lists.js";
 
 class AuthStore {
   constructor() {
@@ -14,6 +16,13 @@ class AuthStore {
   }
 
   setUser(user) {
+    const prevUser = this.state.user;
+    if (prevUser && user && prevUser.id !== user.id) {
+      // Identity changed: completely reset task and list store state
+      taskStore.reset();
+      listStore.reset();
+    }
+
     this.state = {
       status: "authenticated",
       user,
@@ -22,6 +31,10 @@ class AuthStore {
   }
 
   clearUser() {
+    // Reset all user-specific state upon clearing session/logout
+    taskStore.reset();
+    listStore.reset();
+
     this.state = {
       status: "unauthenticated",
       user: null,

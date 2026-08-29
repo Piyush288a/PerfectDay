@@ -1,3 +1,5 @@
+import { showNotesPopover } from "./NotesPopover.js";
+
 export const renderTaskItemHTML = (task, activeView, lists = [], selectedTaskId = null) => {
   const isHighPriority = task.priority === "HIGH";
   const isCompleted = Boolean(task.isCompleted);
@@ -27,7 +29,7 @@ export const renderTaskItemHTML = (task, activeView, lists = [], selectedTaskId 
     dueDateHTML = `
       <span class="task-meta-pill task-meta-due ${isOverdue ? "overdue" : ""} ${isToday ? "today" : ""}">
         <i data-lucide="calendar" style="width: 12px; height: 12px;"></i>
-        <span>${dateText}</span>
+        <span>${isOverdue ? "Overdue: " : ""}${dateText}</span>
       </span>
     `;
   }
@@ -72,13 +74,20 @@ export const renderTaskItemHTML = (task, activeView, lists = [], selectedTaskId 
     `;
   }
 
-  // Format notes indicator icon
+  // Format notes indicator icon (clickable for preview popover)
   let notesIndicatorHTML = "";
   if (task.notes && task.notes.trim()) {
     notesIndicatorHTML = `
-      <span class="task-meta-pill task-meta-notes" title="Has notes">
+      <button 
+        type="button" 
+        class="task-meta-pill task-meta-notes-btn" 
+        data-action="preview-notes" 
+        data-task-id="${task.id}"
+        title="View note preview"
+        aria-label="View note preview"
+      >
         <i data-lucide="file-text" style="width: 12px; height: 12px;"></i>
-      </span>
+      </button>
     `;
   }
 

@@ -12,16 +12,21 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
 }
 
 body {
-  min-height: 100vh;
+  height: 100%;
+  width: 100%;
   font-family: var(--font-sans);
   font-size: var(--text-base);
   line-height: 1.5;
   color: var(--color-text-primary);
   background-color: var(--color-bg-base);
-  overflow-x: hidden;
+  overflow: hidden;
+  position: relative;
   transition: background-color var(--transition-normal), color var(--transition-normal);
 }
 
