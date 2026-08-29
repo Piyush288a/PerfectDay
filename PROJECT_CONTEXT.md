@@ -54,7 +54,7 @@ Visual screenshots provided by the user are **inspiration only**. Do not copy th
 
 ### Development
 
-Git, GitHub, Cursor Agent.
+Git, GitHub, Cursor Agent, Antigravity Agent.
 
 **Dependency policy:** Do not introduce unnecessary packages. Do not install dependencies until Phase 1 is requested.
 
@@ -244,7 +244,7 @@ Required capabilities:
 | **10** | Subtasks, tags, reminders, recurring tasks, and calendar. |
 | **11** | Testing, security, accessibility, performance, responsive design, and production polish. |
 
-**Current phase:** 7B complete. Frontend integrated with real PostgreSQL-backed Tasks and Lists REST APIs via reactive `taskStore` and `listStore`. Real My Day (`myDayOn`), Important (`priority === HIGH`), Planned (upcoming due dates), All Tasks, and Custom Lists views active with optimistic mutations, error rollback, and server reconciliation. Next: Phase 7C / Phase 8 when requested.
+**Current phase:** 7C complete. Task Interaction & Productivity UX implemented: responsive Slide-Over Task Detail Panel (right drawer), debounced autosave for title/notes (500ms), native datepicker with quick chips (Today/Tomorrow/Clear), 4-tier priority selector (`NONE`, `LOW`, `MEDIUM`, `HIGH`), list reassignment, My Day toggle (`myDayOn`), accessible delete confirmation modal, optimistic completion with error rollback, and keyboard navigation (Escape to close). Next: Phase 8 when requested.
 
 ---
 

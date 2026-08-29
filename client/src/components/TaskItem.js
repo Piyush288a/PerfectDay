@@ -1,16 +1,51 @@
-export const renderTaskItemHTML = (task, activeView, lists = []) => {
+export const renderTaskItemHTML = (task, activeView, lists = [], selectedTaskId = null) => {
   const isHighPriority = task.priority === "HIGH";
   const isCompleted = Boolean(task.isCompleted);
+  const isSelected = task.id === selectedTaskId;
 
   // Format due date if available
   let dueDateHTML = "";
   if (task.dueDate) {
     const d = new Date(task.dueDate);
-    const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const checkDate = new Date(d);
+    checkDate.setHours(0, 0, 0, 0);
+
+    let dateText = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    let isOverdue = false;
+    let isToday = false;
+
+    if (checkDate.getTime() === today.getTime()) {
+      dateText = "Today";
+      isToday = true;
+    } else if (checkDate.getTime() < today.getTime() && !isCompleted) {
+      isOverdue = true;
+    }
+
     dueDateHTML = `
-      <span class="task-meta-pill task-meta-due">
+      <span class="task-meta-pill task-meta-due ${isOverdue ? "overdue" : ""} ${isToday ? "today" : ""}">
         <i data-lucide="calendar" style="width: 12px; height: 12px;"></i>
-        <span>${dateStr}</span>
+        <span>${dateText}</span>
+      </span>
+    `;
+  }
+
+  // Format priority pill for LOW and MEDIUM (HIGH is displayed by star)
+  let priorityPillHTML = "";
+  if (task.priority === "MEDIUM") {
+    priorityPillHTML = `
+      <span class="task-meta-pill task-meta-priority-med">
+        <i data-lucide="flag" style="width: 11px; height: 11px;"></i>
+        <span>Med</span>
+      </span>
+    `;
+  } else if (task.priority === "LOW") {
+    priorityPillHTML = `
+      <span class="task-meta-pill task-meta-priority-low">
+        <i data-lucide="flag" style="width: 11px; height: 11px;"></i>
+        <span>Low</span>
       </span>
     `;
   }
@@ -21,7 +56,7 @@ export const renderTaskItemHTML = (task, activeView, lists = []) => {
     listBadgeHTML = `
       <span class="task-meta-pill task-meta-list">
         <i data-lucide="list" style="width: 12px; height: 12px;"></i>
-        <span>${task.list.name}</span>
+        <span>${escapeHTML(task.list.name)}</span>
       </span>
     `;
   }
@@ -37,8 +72,18 @@ export const renderTaskItemHTML = (task, activeView, lists = []) => {
     `;
   }
 
+  // Format notes indicator icon
+  let notesIndicatorHTML = "";
+  if (task.notes && task.notes.trim()) {
+    notesIndicatorHTML = `
+      <span class="task-meta-pill task-meta-notes" title="Has notes">
+        <i data-lucide="file-text" style="width: 12px; height: 12px;"></i>
+      </span>
+    `;
+  }
+
   return `
-    <div class="task-item ${isCompleted ? "completed" : ""}" data-task-id="${task.id}">
+    <div class="task-item ${isCompleted ? "completed" : ""} ${isSelected ? "selected" : ""}" data-task-id="${task.id}">
       <!-- Checkbox -->
       <button 
         type="button" 
@@ -50,14 +95,16 @@ export const renderTaskItemHTML = (task, activeView, lists = []) => {
         <i data-lucide="${isCompleted ? "check" : "circle"}" style="width: 18px; height: 18px;"></i>
       </button>
 
-      <!-- Content -->
-      <div class="task-content">
-        <span class="task-title" data-action="edit-title" data-task-id="${task.id}">${escapeHTML(task.title)}</span>
+      <!-- Content (Click to open detail) -->
+      <div class="task-content" data-action="open-detail" data-task-id="${task.id}">
+        <span class="task-title">${escapeHTML(task.title)}</span>
         
         <div class="task-meta-row">
           ${myDayBadgeHTML}
           ${dueDateHTML}
+          ${priorityPillHTML}
           ${listBadgeHTML}
+          ${notesIndicatorHTML}
         </div>
       </div>
 

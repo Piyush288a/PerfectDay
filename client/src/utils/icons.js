@@ -30,6 +30,8 @@ import {
   Trash2,
   Circle,
   List,
+  Flag,
+  FileText,
 } from "lucide";
 
 export const initIcons = () => {
@@ -65,6 +67,8 @@ export const initIcons = () => {
       Trash2,
       Circle,
       List,
+      Flag,
+      FileText,
     },
   });
 };

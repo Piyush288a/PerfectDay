@@ -4,6 +4,8 @@ import { authStore } from "../store/auth.js";
 import { listStore } from "../store/lists.js";
 import { taskStore } from "../store/tasks.js";
 import { renderTaskItemHTML } from "../components/TaskItem.js";
+import { renderTaskDetailPanelHTML, initTaskDetailPanelEvents } from "../components/TaskDetailPanel.js";
+import { showConfirmModal } from "../components/Modal.js";
 import { initIcons } from "../utils/icons.js";
 
 let unsubscribeListStore = null;
@@ -215,6 +217,7 @@ export const renderAppShellView = () => {
                         data-action="delete-list" 
                         data-list-id="${list.id}"
                         data-list-count="${list._count?.tasks || 0}"
+                        data-list-name="${escapeHTML(list.name)}"
                         title="Delete list" 
                         aria-label="Delete list"
                       >
@@ -238,7 +241,7 @@ export const renderAppShellView = () => {
         </div>
 
         <div style="padding-top: var(--space-4); border-top: 1px solid var(--color-border-subtle); font-size: var(--text-xs); color: var(--color-text-muted);">
-          <span>PerfectDay v0.7.0</span>
+          <span>PerfectDay v0.7.1</span>
         </div>
       </aside>
 
@@ -278,13 +281,16 @@ export const renderAppShellView = () => {
           </div>
         </div>
       </main>
+
+      <!-- Slide-Over Task Detail Panel -->
+      <aside class="task-detail-panel" id="task-detail-panel" aria-label="Task Details"></aside>
     </div>
   </div>
   `;
 };
 
 const renderTasksListContent = () => {
-  const { tasks, loading, currentView } = taskStore.getState();
+  const { tasks, loading, currentView, selectedTaskId } = taskStore.getState();
   const { lists } = listStore.getState();
   const container = document.getElementById("workspace-tasks-container");
   if (!container) return;
@@ -323,7 +329,7 @@ const renderTasksListContent = () => {
   if (activeTasks.length > 0) {
     html += `
       <div class="task-list">
-        ${activeTasks.map((task) => renderTaskItemHTML(task, currentView, lists)).join("")}
+        ${activeTasks.map((task) => renderTaskItemHTML(task, currentView, lists, selectedTaskId)).join("")}
       </div>
     `;
   }
@@ -333,7 +339,7 @@ const renderTasksListContent = () => {
       <div class="task-list-section" style="margin-top: var(--space-4);">
         <div class="task-section-title">Completed (${completedTasks.length})</div>
         <div class="task-list">
-          ${completedTasks.map((task) => renderTaskItemHTML(task, currentView, lists)).join("")}
+          ${completedTasks.map((task) => renderTaskItemHTML(task, currentView, lists, selectedTaskId)).join("")}
         </div>
       </div>
     `;
@@ -341,6 +347,24 @@ const renderTasksListContent = () => {
 
   html += `</div>`;
   container.innerHTML = html;
+  initIcons();
+};
+
+const updateDetailPanel = () => {
+  const { selectedTask } = taskStore.getState();
+  const { lists } = listStore.getState();
+  const panel = document.getElementById("task-detail-panel");
+  if (!panel) return;
+
+  if (!selectedTask) {
+    panel.classList.remove("open");
+    panel.innerHTML = "";
+    return;
+  }
+
+  panel.classList.add("open");
+  panel.innerHTML = renderTaskDetailPanelHTML(selectedTask, lists);
+  initTaskDetailPanelEvents(panel);
   initIcons();
 };
 
@@ -368,6 +392,7 @@ const updateSidebarLists = () => {
               data-action="delete-list" 
               data-list-id="${list.id}"
               data-list-count="${list._count?.tasks || 0}"
+              data-list-name="${escapeHTML(list.name)}"
               title="Delete list" 
               aria-label="Delete list"
             >
@@ -443,6 +468,16 @@ export const initAppShellEvents = () => {
     });
   }
 
+  // Global Keyboard Handling (Escape closes detail panel)
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      const { selectedTaskId } = taskStore.getState();
+      if (selectedTaskId) {
+        taskStore.closeDetail();
+      }
+    }
+  });
+
   // Navigation Click Handling (Delegated on Sidebar)
   if (sidebar) {
     sidebar.addEventListener("click", async (e) => {
@@ -452,6 +487,7 @@ export const initAppShellEvents = () => {
         e.stopPropagation();
         e.preventDefault();
         const listId = deleteListBtn.dataset.listId;
+        const listName = deleteListBtn.dataset.listName || "this list";
         const taskCount = parseInt(deleteListBtn.dataset.listCount || "0", 10);
 
         if (taskCount > 0) {
@@ -462,21 +498,29 @@ export const initAppShellEvents = () => {
           return;
         }
 
-        try {
-          await listStore.deleteList(listId);
-          showToast({
-            message: "List deleted successfully.",
-            type: "info",
-          });
-          if (taskStore.getState().currentView === listId) {
-            taskStore.setView("my-day");
-          }
-        } catch (err) {
-          showToast({
-            message: err.message || "Failed to delete list.",
-            type: "error",
-          });
-        }
+        showConfirmModal({
+          title: "Delete list?",
+          message: `Are you sure you want to delete the list "${listName}"?`,
+          confirmText: "Delete",
+          isDestructive: true,
+          onConfirm: async () => {
+            try {
+              await listStore.deleteList(listId);
+              showToast({
+                message: "List deleted successfully.",
+                type: "info",
+              });
+              if (taskStore.getState().currentView === listId) {
+                taskStore.setView("my-day");
+              }
+            } catch (err) {
+              showToast({
+                message: err.message || "Failed to delete list.",
+                type: "error",
+              });
+            }
+          },
+        });
         return;
       }
 
@@ -486,15 +530,12 @@ export const initAppShellEvents = () => {
         e.preventDefault();
         const targetView = navItem.dataset.nav;
 
-        // Update active class in sidebar
-        document.querySelectorAll("[data-nav]").forEach((el) => el.classList.remove("active"));
-        navItem.classList.add("active");
-
         // Close sidebar on mobile
         if (window.innerWidth <= 768 && sidebar) {
           sidebar.classList.remove("open");
         }
 
+        taskStore.closeDetail();
         taskStore.setView(targetView);
       }
     });
@@ -591,7 +632,7 @@ export const initAppShellEvents = () => {
       } else if (currentView === "important") {
         taskPayload.priority = "HIGH";
       } else if (currentView !== "all-tasks" && currentView !== "planned") {
-        // Must be a custom list ID
+        // Custom list ID
         taskPayload.listId = currentView;
       }
 
@@ -620,6 +661,7 @@ export const initAppShellEvents = () => {
       // 1. Completion Toggle
       const completeBtn = e.target.closest('[data-action="toggle-complete"]');
       if (completeBtn) {
+        e.stopPropagation();
         const taskId = completeBtn.dataset.taskId;
         try {
           await taskStore.toggleComplete(taskId);
@@ -635,6 +677,7 @@ export const initAppShellEvents = () => {
       // 2. Priority Toggle
       const starBtn = e.target.closest('[data-action="toggle-priority"]');
       if (starBtn) {
+        e.stopPropagation();
         const taskId = starBtn.dataset.taskId;
         try {
           await taskStore.togglePriority(taskId);
@@ -647,23 +690,42 @@ export const initAppShellEvents = () => {
         return;
       }
 
-      // 3. Delete Task
+      // 3. Delete Task with Confirmation Modal
       const deleteBtn = e.target.closest('[data-action="delete-task"]');
       if (deleteBtn) {
+        e.stopPropagation();
         const taskId = deleteBtn.dataset.taskId;
-        try {
-          await taskStore.deleteTask(taskId);
-          showToast({
-            message: "Task deleted.",
-            type: "info",
-          });
-        } catch (err) {
-          showToast({
-            message: err.message || "Failed to delete task.",
-            type: "error",
-          });
-        }
+        const taskObj = taskStore.getState().tasks.find((t) => t.id === taskId);
+        const title = taskObj?.title || "this task";
+
+        showConfirmModal({
+          title: "Delete task?",
+          message: `Are you sure you want to permanently delete "${title}"?`,
+          confirmText: "Delete",
+          isDestructive: true,
+          onConfirm: async () => {
+            try {
+              await taskStore.deleteTask(taskId);
+              showToast({
+                message: "Task deleted.",
+                type: "info",
+              });
+            } catch (err) {
+              showToast({
+                message: err.message || "Failed to delete task.",
+                type: "error",
+              });
+            }
+          },
+        });
         return;
+      }
+
+      // 4. Open Task Detail Panel
+      const taskContent = e.target.closest('[data-action="open-detail"]');
+      if (taskContent) {
+        const taskId = taskContent.dataset.taskId;
+        taskStore.selectTask(taskId);
       }
     });
   }
@@ -672,11 +734,14 @@ export const initAppShellEvents = () => {
   unsubscribeListStore = listStore.subscribe(() => {
     updateSidebarLists();
     updateWorkspaceHeader();
+    updateDetailPanel();
   });
 
   unsubscribeTaskStore = taskStore.subscribe(() => {
     renderTasksListContent();
     updateWorkspaceHeader();
+    updateDetailPanel();
+
     // Highlight active nav item
     const { currentView } = taskStore.getState();
     document.querySelectorAll("[data-nav]").forEach((el) => {

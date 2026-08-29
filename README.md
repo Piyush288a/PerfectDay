@@ -2,7 +2,7 @@
 
 A modern personal productivity and to-do app: premium UI, REST API, and PostgreSQL. Inspired by Microsoft To Do and Google Tasks — not a copy of either.
 
-**Status:** Phase 7B — frontend tasks & lists integration complete. Connected application shell to live PostgreSQL-backed Tasks and Lists REST APIs via reactive `taskStore` and `listStore`. Real My Day, Important, Planned, All Tasks, and Custom Lists views active with optimistic mutations and server reconciliation.
+**Status:** Phase 7C — task interaction & productivity UX complete. Responsive Slide-Over Task Detail Panel (right drawer), debounced autosave for title/notes (500ms), native datepicker with quick chips, 4-tier priority selector, list moving, My Day assignment (`myDayOn`), accessible delete confirmation modal, and full keyboard/mobile accessibility active.
 
 ## Stack
 
