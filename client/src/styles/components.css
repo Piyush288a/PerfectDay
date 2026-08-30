@@ -184,26 +184,33 @@
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
   transition: color var(--transition-fast);
+  position: relative;
 }
 
 .checkbox-container:hover {
   color: var(--color-text-primary);
 }
 
-.checkbox-container:hover .checkbox-custom {
+.checkbox-container:hover .checkbox-visual {
   border-color: var(--color-primary);
 }
 
+/* Accessible input visually positioned over the checkbox square */
 .checkbox-input {
   position: absolute;
-  opacity: 0;
-  cursor: pointer;
+  top: 0;
+  left: 0;
   width: 16px;
   height: 16px;
+  opacity: 0;
+  cursor: pointer;
   margin: 0;
+  padding: 0;
+  z-index: 2;
 }
 
-.checkbox-custom {
+/* Visual custom check box — non-interactive presentation layer */
+.checkbox-visual {
   width: 16px;
   height: 16px;
   border-radius: var(--radius-sm);
@@ -215,15 +222,22 @@
   transition: all var(--transition-fast);
   position: relative;
   flex-shrink: 0;
+  pointer-events: none;
+  z-index: 1;
 }
 
-.checkbox-input:checked ~ .checkbox-custom {
+.checkbox-label {
+  cursor: pointer;
+  z-index: 1;
+}
+
+.checkbox-input:checked ~ .checkbox-visual {
   background-color: var(--color-primary);
   border-color: var(--color-primary);
   color: #FFFFFF;
 }
 
-.checkbox-input:checked ~ .checkbox-custom::after {
+.checkbox-input:checked ~ .checkbox-visual::after {
   content: "";
   display: block;
   width: 4px;
@@ -232,9 +246,10 @@
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
   margin-bottom: 2px;
+  pointer-events: none;
 }
 
-.checkbox-input:focus-visible ~ .checkbox-custom {
+.checkbox-input:focus-visible ~ .checkbox-visual {
   box-shadow: var(--shadow-focus);
   border-color: var(--color-primary);
 }

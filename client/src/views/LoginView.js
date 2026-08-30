@@ -103,9 +103,9 @@ export const renderLoginView = () => `
 
             <!-- Form Row: Remember me & Forgot Password -->
             <div class="auth-form-row">
-              <label class="checkbox-container" title="Keep me signed in on this browser">
+              <label class="checkbox-container" for="remember-me" title="Keep me signed in on this browser">
                 <input type="checkbox" id="remember-me" name="rememberMe" class="checkbox-input" />
-                <span class="checkbox-custom"></span>
+                <span class="checkbox-visual" aria-hidden="true"></span>
                 <span class="checkbox-label">Remember me</span>
               </label>
 
