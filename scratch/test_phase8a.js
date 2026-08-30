@@ -258,6 +258,26 @@ const runTests = async () => {
     });
     assert(refreshBRes.status === 200 && refreshBRes.body?.data?.id === userB.id, "User B refresh returns User B identity only");
 
+    // 16. UI DOM Verification: LoginView Remember Me control is fully enabled and interactive
+    const { JSDOM } = await import("jsdom");
+    const { renderLoginView } = await import("../client/src/views/LoginView.js");
+    const dom = new JSDOM(`<!DOCTYPE html><html><body><div id="app">${renderLoginView()}</div></body></html>`);
+    const doc = dom.window.document;
+    const rememberCheckbox = doc.getElementById("remember-me");
+    assert(Boolean(rememberCheckbox), "Remember Me checkbox exists in LoginView DOM");
+    assert(rememberCheckbox.disabled === false && !rememberCheckbox.hasAttribute("disabled"), "Remember Me checkbox is NOT disabled in DOM");
+    assert(rememberCheckbox.getAttribute("aria-disabled") !== "true", "Remember Me checkbox has no aria-disabled attribute");
+
+    const rememberLabel = rememberCheckbox.closest("label")?.textContent || "";
+    assert(!rememberLabel.includes("1h session") && !rememberLabel.includes("Fixed 1-hour"), "Obsolete '1h session' label text removed from UI");
+
+    // Simulate clicking checkbox
+    rememberCheckbox.click();
+    assert(rememberCheckbox.checked === true, "Clicking Remember Me checkbox checks the box ([x] Remember me)");
+
+    rememberCheckbox.click();
+    assert(rememberCheckbox.checked === false, "Clicking Remember Me checkbox again unchecks the box ([ ] Remember me)");
+
     // Cleanup
     await prisma.user.deleteMany({
       where: { email: { in: [testEmailA, testEmailB] } },

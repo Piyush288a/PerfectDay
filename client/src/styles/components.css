@@ -183,12 +183,24 @@
   user-select: none;
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
+  transition: color var(--transition-fast);
+}
+
+.checkbox-container:hover {
+  color: var(--color-text-primary);
+}
+
+.checkbox-container:hover .checkbox-custom {
+  border-color: var(--color-primary);
 }
 
 .checkbox-input {
   position: absolute;
   opacity: 0;
   cursor: pointer;
+  width: 16px;
+  height: 16px;
+  margin: 0;
 }
 
 .checkbox-custom {
@@ -201,6 +213,8 @@
   align-items: center;
   justify-content: center;
   transition: all var(--transition-fast);
+  position: relative;
+  flex-shrink: 0;
 }
 
 .checkbox-input:checked ~ .checkbox-custom {
@@ -209,8 +223,20 @@
   color: #FFFFFF;
 }
 
+.checkbox-input:checked ~ .checkbox-custom::after {
+  content: "";
+  display: block;
+  width: 4px;
+  height: 8px;
+  border: solid #FFFFFF;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  margin-bottom: 2px;
+}
+
 .checkbox-input:focus-visible ~ .checkbox-custom {
   box-shadow: var(--shadow-focus);
+  border-color: var(--color-primary);
 }
 
 /* Theme Toggle Pill */
