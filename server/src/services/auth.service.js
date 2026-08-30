@@ -51,6 +51,12 @@ export const registerUser = async ({ email, password, displayName, timezone }) =
   return toSafeUser(createdUser);
 };
 
+/**
+ * Authenticate a user by email + password.
+ *
+ * Phase 8A: Returns the safe user object. The controller decides whether
+ * to issue a refresh session based on rememberMe.
+ */
 export const loginUser = async ({ email, password }) => {
   const normalizedEmail = email.trim().toLowerCase();
 
@@ -59,8 +65,16 @@ export const loginUser = async ({ email, password }) => {
     where: { email: normalizedEmail },
   });
 
+  // Guard: user must exist and have a password (not Google-only account)
   if (!user) {
     throw new UnauthorizedError("Invalid email or password");
+  }
+
+  if (!user.passwordHash) {
+    // Google-only account — cannot log in with password
+    throw new UnauthorizedError(
+      "This account uses Google Sign-In. Please continue with Google."
+    );
   }
 
   // Verify password with bcrypt

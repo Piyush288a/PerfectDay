@@ -22,13 +22,14 @@ enum RecurrenceRule {
 }
 
 model User {
-  id           String     @id @default(uuid()) @db.Uuid
-  email        String     @unique
-  passwordHash String
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  passwordHash String?   // Nullable: null for Google-only accounts
+  googleId     String?   @unique // Google OAuth sub claim
   displayName  String?
-  timezone     String     @default("UTC")
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  timezone     String    @default("UTC")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   lists        List[]
   tasks        Task[]
@@ -36,6 +37,7 @@ model User {
   tags         Tag[]
   taskTags     TaskTag[]
   reminders    Reminder[]
+  sessions     Session[] // Persistent Remember Me sessions
 }
 
 model List {
@@ -142,4 +144,22 @@ model Reminder {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isSent, remindAt])
+}
+
+// Phase 8A: Persistent Remember Me sessions (refresh tokens)
+model Session {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @db.Uuid
+  tokenHash   String    @unique             // bcrypt hash of the raw refresh token
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime  @default(now())
+  revokedAt   DateTime?                     // Set when session is invalidated
+  userAgent   String?
+  ipAddress   String?
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }

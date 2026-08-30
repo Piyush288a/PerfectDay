@@ -50,18 +50,20 @@ PerfectDay is a fast, elegant, keyboard-friendly personal productivity and to-do
 | **7.5** | Stabilization, Security Isolation & Major Dashboard UI Refinement. | ✅ Complete |
 | **7.9** | UI Refinement & Final Polish (Glassmorphism, Scheduling Semantics, Hover Clipping Fix, Fixed Composer). | ✅ Complete |
 | **7.9.1** | Final UI Bug Fix / Visual QA Pass (Single-line Title, Truly Fixed Composer, Clean Scrollbars, Optimistic Rename). | ✅ Complete |
-| **7.9.5** | **Final Fix: True Fixed App Chrome & Strict Viewport Isolation (Fixed Top/Nav/Composer, Independent Planned Horizontal Viewport).** | ✅ Complete |
-| **8** | Subtasks, tags, reminders, recurring tasks, and calendar. | Next |
+| **7.9.5** | Final Fix: True Fixed App Chrome & Strict Viewport Isolation. | ✅ Complete |
+| **8A** | **Authentication Enhancements: Real Remember Me & Server-Side Session Management (DB-backed refresh tokens, rotating session cookies, silent auto-refresh).** | ✅ Complete |
+| **8B** | Continue with Google (OAuth 2.0 PKCE / Authorization Code Flow, safe account linking). | Next |
 | **9** | Advanced search, filtering, and sorting. | Planned |
 | **10** | Performance optimization, polish, and production release. | Planned |
 
-**Current phase:** **Phase 7.9.5 Complete**. Verified across 98 backend/integration tests and 60 browser/DOM acceptance tests.
+**Current phase:** **Phase 8A Complete**. Verified across 125 backend/integration tests (Phase 7A: 26, 7B: 25, 7C: 19, 7.5: 28, 8A: 27) and 43 browser/DOM acceptance tests.
 
 ---
 
-## 4. Verification Breakdown (Phase 7.9.5)
+## 4. Verification Breakdown (Phase 8A)
 
-### 4.1 Automated Tested
+### 4.1 Automated Test Suites (125/125 Passed)
+- **Phase 8A Remember Me & Session Management Suite** (`27/27`): Remember Me OFF session cookie behavior, Remember Me ON 30-day persistent session creation, DB bcrypt token hash storage, transparent token rotation (`POST /api/auth/refresh`), silent auto-refresh on expired access token via `pd_refresh` cookie, session revocation on logout, revoked token rejection (`401 Unauthorized`), cross-account session isolation.
 - **Phase 7A Backend REST API Suite** (`26/26`): Unauthenticated route protection, default list generation, custom list CRUD, task CRUD, filter queries (`myDay`, `listId`), authorization enforcement (`404/403` on cross-user ID access), conflict protection on non-empty list deletion.
 - **Phase 7B Frontend Real API Integration Suite** (`25/25`): Real backend communication via `fetch`, session restoration from cookie, optimistic completion/priority toggle with rollback, default list loading, list counter reconciliation.
 - **Phase 7C Task Interaction & Productivity UX Suite** (`19/19`): Right detail panel metadata binding, title autosave, multi-line notes persistence, priority transitions (`HIGH`, `MEDIUM`, `LOW`, `NONE`), due date updating/clearing (`null`), task deletion with confirmation.

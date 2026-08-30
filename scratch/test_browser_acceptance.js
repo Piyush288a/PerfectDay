@@ -22,7 +22,7 @@ const runBrowserAcceptanceTests = async () => {
 
   // Start real backend server
   const server = spawn("node", ["--env-file=.env", "src/index.js"], {
-    cwd: "S:/PROJECTS/PerfectDay/server",
+    cwd: "d:/IGNORE/PROJECTS/PerfectDay/server",
     stdio: "inherit",
   });
 
@@ -30,7 +30,6 @@ const runBrowserAcceptanceTests = async () => {
 
   try {
     // Setup Cookie-aware DOM environment
-    const nativeFetch = globalThis.fetch;
     const cookieJars = new Map(); // username -> cookieHeader
 
     const createBrowserContext = (currentUserCookie = "") => {
@@ -39,13 +38,13 @@ const runBrowserAcceptanceTests = async () => {
         pretendToBeVisual: true,
       });
 
-      const win = dom.window;
-      global.window = win;
-      global.document = win.document;
-      Object.defineProperty(global, 'navigator', { value: win.navigator, configurable: true, writable: true });
-      global.HTMLElement = win.HTMLElement;
-      global.Element = win.Element;
-      global.CustomEvent = win.CustomEvent;
+      const { window } = dom;
+      global.window = window;
+      global.document = window.document;
+      global.navigator = window.navigator;
+      global.HTMLElement = window.HTMLElement;
+      global.Element = window.Element;
+      global.CustomEvent = window.CustomEvent;
 
       let currentCookie = currentUserCookie;
 
@@ -59,7 +58,7 @@ const runBrowserAcceptanceTests = async () => {
         if (currentCookie) {
           headers["Cookie"] = currentCookie;
         }
-        const response = await nativeFetch(fetchUrl, { ...options, headers });
+        const response = await fetch(fetchUrl, { ...options, headers });
         const setCookie = response.headers.get("set-cookie");
         if (setCookie) {
           currentCookie = setCookie.split(";")[0];
@@ -114,15 +113,14 @@ const runBrowserAcceptanceTests = async () => {
     await sleep(300);
 
     // User A creates a task
-    const createdTaskA = await taskStore.createTask({
+    await taskStore.createTask({
       title: "Alice Secret Document",
       notes: "Top secret notes for Alice only.",
       priority: "HIGH",
-      myDayOn: new Date().toISOString().split("T")[0],
     });
     await sleep(200);
 
-    const taskA = createdTaskA || taskStore.getState().tasks.find((t) => t.title === "Alice Secret Document");
+    const taskA = taskStore.getState().tasks.find((t) => t.title === "Alice Secret Document");
     assert(Boolean(taskA), "2. User A task created and rendered in DOM");
 
     // User A opens task detail panel
@@ -189,7 +187,6 @@ const runBrowserAcceptanceTests = async () => {
 
     document.getElementById("app").innerHTML = renderAppShellView();
     initAppShellEvents();
-    await taskStore.fetchTasks();
     await sleep(300);
 
     const restoredTasks = taskStore.getState().tasks;
@@ -419,7 +416,7 @@ const runBrowserAcceptanceTests = async () => {
 
     // Planned View Horizontal Layout
     taskStore.setView("planned");
-    await sleep(400);
+    await sleep(200);
     const plannedContainer = document.getElementById("planned-horizontal-workspace");
     assert(Boolean(plannedContainer), "39. Horizontal date-based Planned workspace rendered in DOM");
 

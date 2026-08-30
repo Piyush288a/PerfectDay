@@ -103,10 +103,10 @@ export const renderLoginView = () => `
 
             <!-- Form Row: Remember me & Forgot Password -->
             <div class="auth-form-row">
-              <label class="checkbox-container" title="Fixed 1-hour session is active" style="opacity: 0.65; cursor: default;">
-                <input type="checkbox" id="remember-me" name="rememberMe" class="checkbox-input" disabled />
+              <label class="checkbox-container" title="Keep me signed in on this browser">
+                <input type="checkbox" id="remember-me" name="rememberMe" class="checkbox-input" />
                 <span class="checkbox-custom"></span>
-                <span class="checkbox-label">Remember me <span style="font-size: 0.65rem; color: var(--color-text-muted);">(1h session)</span></span>
+                <span class="checkbox-label">Remember me</span>
               </label>
 
               <a href="javascript:void(0)" class="forgot-password-link" id="forgot-password-link">
@@ -257,9 +257,11 @@ export const initLoginViewEvents = () => {
 
       const emailInput = document.getElementById("login-email");
       const passwordInput = document.getElementById("login-password");
+      const rememberMeInput = document.getElementById("remember-me");
 
       const email = emailInput?.value.trim() || "";
       const password = passwordInput?.value || "";
+      const rememberMe = Boolean(rememberMeInput?.checked);
 
       // Client-side validation
       if (!email) {
@@ -283,7 +285,7 @@ export const initLoginViewEvents = () => {
       `;
 
       try {
-        const user = await authApi.login({ email, password });
+        const user = await authApi.login({ email, password, rememberMe });
         authStore.setUser(user);
 
         const name = user.displayName || user.email.split("@")[0];

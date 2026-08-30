@@ -33,4 +33,6 @@ export const loginSchema = z.object({
     .string()
     .min(1, "Password is required")
     .max(72, "Password must not exceed 72 characters"),
+  // Phase 8A: Remember Me — if true, a persistent refresh token session is created
+  rememberMe: z.boolean().optional().default(false),
 });

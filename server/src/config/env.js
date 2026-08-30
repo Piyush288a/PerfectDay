@@ -11,6 +11,14 @@ const envSchema = z.object({
     .string()
     .min(32, "JWT_SECRET must be at least 32 characters long"),
   JWT_EXPIRES_IN: z.string().default("1h"),
+  // Phase 8A: Refresh token secret (separate from access token secret)
+  REFRESH_TOKEN_SECRET: z
+    .string()
+    .min(32, "REFRESH_TOKEN_SECRET must be at least 32 characters long")
+    .optional()
+    .default("change-me-refresh-secret-at-least-32-chars"),
+  // 30 days persistent session lifetime
+  REFRESH_TOKEN_EXPIRES_DAYS: z.coerce.number().default(30),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

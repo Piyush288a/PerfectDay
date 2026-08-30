@@ -13,13 +13,20 @@ export const authApi = {
     });
   },
 
-  login: async ({ email, password }) => {
+  login: async ({ email, password, rememberMe = false }) => {
     return apiClient("/api/auth/login", {
       method: "POST",
       body: {
         email,
         password,
+        rememberMe: Boolean(rememberMe),
       },
+    });
+  },
+
+  refreshSession: async () => {
+    return apiClient("/api/auth/refresh", {
+      method: "POST",
     });
   },
 
