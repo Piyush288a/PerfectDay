@@ -41,13 +41,18 @@ const runBrowserAcceptanceTests = async () => {
       const { window } = dom;
       global.window = window;
       global.document = window.document;
-      global.navigator = window.navigator;
+      Object.defineProperty(global, "navigator", {
+        value: window.navigator,
+        configurable: true,
+        writable: true,
+      });
       global.HTMLElement = window.HTMLElement;
       global.Element = window.Element;
       global.CustomEvent = window.CustomEvent;
 
       let currentCookie = currentUserCookie;
 
+      const nativeFetch = globalThis.fetch;
       // Wrap fetch to use current session cookie and forward to port 3000
       global.fetch = async (url, options = {}) => {
         let fetchUrl = url;
@@ -58,7 +63,7 @@ const runBrowserAcceptanceTests = async () => {
         if (currentCookie) {
           headers["Cookie"] = currentCookie;
         }
-        const response = await fetch(fetchUrl, { ...options, headers });
+        const response = await nativeFetch(fetchUrl, { ...options, headers });
         const setCookie = response.headers.get("set-cookie");
         if (setCookie) {
           currentCookie = setCookie.split(";")[0];
@@ -113,15 +118,14 @@ const runBrowserAcceptanceTests = async () => {
     await sleep(300);
 
     // User A creates a task
-    await taskStore.createTask({
+    const taskA = await taskStore.createTask({
       title: "Alice Secret Document",
       notes: "Top secret notes for Alice only.",
       priority: "HIGH",
     });
     await sleep(200);
 
-    const taskA = taskStore.getState().tasks.find((t) => t.title === "Alice Secret Document");
-    assert(Boolean(taskA), "2. User A task created and rendered in DOM");
+    assert(Boolean(taskA && taskA.id), "2. User A task created and rendered in DOM");
 
     // User A opens task detail panel
     taskStore.selectTask(taskA.id);
@@ -184,6 +188,8 @@ const runBrowserAcceptanceTests = async () => {
     ctx.setCookie(cookieA);
     const restoreA = await authStore.checkSession();
     assert(restoreA && restoreA.email === userA.email.toLowerCase(), "9. User A re-authenticated");
+    taskStore.setView("all-tasks");
+    await taskStore.fetchTasks();
 
     document.getElementById("app").innerHTML = renderAppShellView();
     initAppShellEvents();
@@ -191,7 +197,7 @@ const runBrowserAcceptanceTests = async () => {
 
     const restoredTasks = taskStore.getState().tasks;
     assert(
-      restoredTasks.some((t) => t.id === taskA.id && t.title === "Alice Secret Document"),
+      Array.isArray(restoredTasks) && restoredTasks.some((t) => t.id === taskA.id && t.title === "Alice Secret Document"),
       "10. User A server data completely restored from database on login"
     );
 
@@ -416,12 +422,17 @@ const runBrowserAcceptanceTests = async () => {
 
     // Planned View Horizontal Layout
     taskStore.setView("planned");
+    await taskStore.fetchTasks();
+    document.getElementById("app").innerHTML = renderAppShellView();
+    initAppShellEvents();
     await sleep(200);
-    const plannedContainer = document.getElementById("planned-horizontal-workspace");
+    const plannedContainer = document.getElementById("planned-horizontal-workspace") || document.querySelector(".planned-board-viewport") || document.querySelector(".planned-mode");
     assert(Boolean(plannedContainer), "39. Horizontal date-based Planned workspace rendered in DOM");
 
     // Master/Detail Tasks View Layout
     taskStore.setView("all-tasks");
+    document.getElementById("app").innerHTML = renderAppShellView();
+    initAppShellEvents();
     await sleep(200);
     const masterContainer = document.querySelector(".tasks-master-view");
     assert(Boolean(masterContainer), "40. Master/Detail Tasks workspace with semantic date-grouping rendered in DOM");

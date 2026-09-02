@@ -100,8 +100,7 @@ export const logout = async (req, res) => {
   // Revoke persistent session if one exists (Remember Me was ON)
   const rawRefreshToken = extractRefreshTokenFromCookie(req);
   if (rawRefreshToken) {
-    // Fire-and-forget — don't block logout response on this
-    revokeSessionByToken(rawRefreshToken).catch((err) => {
+    await revokeSessionByToken(rawRefreshToken).catch((err) => {
       console.warn("Session revocation warning during logout:", err.message);
     });
   }

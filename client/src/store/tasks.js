@@ -145,7 +145,9 @@ class TaskStore {
             this.state.selectedTask = { ...matching };
           }
         }
-        this.state.error = null;
+        this.state.loading = false;
+        this.notify();
+        return this.state.tasks;
       }
     } catch (err) {
       if (this.activeRequestId === requestId) {

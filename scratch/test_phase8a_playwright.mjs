@@ -228,12 +228,38 @@ const runPlaywrightTest = async () => {
       `Form submission sends rememberMe: true when checked (received: ${lastLoginPayload?.rememberMe})`
     );
 
-    const meStatus = await page.evaluate(() => fetch("/api/auth/me").then((r) => r.status));
+    const meStatus = await page.evaluate(() => fetch("http://localhost:3000/api/auth/me", { credentials: "include" }).then((r) => r.status));
     assert(meStatus === 200, "Login with rememberMe=true sets persistent session (200 OK)");
+
+    // 8. Test Browser Context Restart Persistence (Remember Me ON)
+    const activeCookies = await context.cookies(["http://localhost:5173", "http://localhost:3000/api/auth"]);
+    await context.close(); // Completely close browser context
+
+    // Reopen brand new browser context with persistent cookies
+    const contextRestart = await browser.newContext();
+    await contextRestart.addCookies(activeCookies);
+    const pageRestart = await contextRestart.newPage();
+
+    await pageRestart.goto("http://localhost:5173/");
+    await sleep(500);
+    const meStatusRestart = await pageRestart.evaluate(() => fetch("http://localhost:3000/api/auth/me", { credentials: "include" }).then((r) => r.status));
+    assert(meStatusRestart === 200, "Reopening browser context restores authenticated session via persistent refresh session (200 OK)");
+
+    // 9. Test Logout Session Revocation
+    await pageRestart.evaluate(() => fetch("http://localhost:3000/api/auth/logout", { method: "POST", credentials: "include" }));
+    await contextRestart.close(); // Close context after logout
+
+    const contextPostLogout = await browser.newContext();
+    const pagePostLogout = await contextPostLogout.newPage();
+    await pagePostLogout.goto("http://localhost:5173/");
+    await sleep(500);
+
+    const meStatusPostLogout = await pagePostLogout.evaluate(() => fetch("http://localhost:3000/api/auth/me", { credentials: "include" }).then((r) => r.status));
+    assert(meStatusPostLogout === 401, "Reopening browser context after logout confirms session is revoked (401 Unauthorized)");
 
     console.log(`\n=== Phase 8A Playwright Physical Interaction Results: ${passed}/${total} Passed ===`);
     if (passed === total) {
-      console.log("🎉 ALL PLAYWRIGHT PHYSICAL INTERACTION TESTS PASSED 100%!");
+      console.log("🎉 ALL PLAYWRIGHT PHYSICAL INTERACTION & PERSISTENCE TESTS PASSED 100%!");
     } else {
       process.exitCode = 1;
     }
