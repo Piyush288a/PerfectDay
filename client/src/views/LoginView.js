@@ -127,7 +127,7 @@ export const renderLoginView = () => `
           </div>
 
           <!-- Google Sign-In Button -->
-          <button type="button" id="google-signin-btn" class="btn btn-google" title="Google sign-in is coming soon">
+          <button type="button" id="google-signin-btn" class="btn btn-google" title="Continue with Google">
             <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
               <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.616z" fill="#4285F4"/>
               <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
@@ -221,17 +221,6 @@ export const initLoginViewEvents = () => {
     });
   }
 
-  // Google sign in mock
-  const googleBtn = document.getElementById("google-signin-btn");
-  if (googleBtn) {
-    googleBtn.addEventListener("click", () => {
-      showToast({
-        message: "Google OAuth sign-in is coming soon.",
-        type: "info",
-      });
-    });
-  }
-
   // Form Submission & Real Authentication
   const form = document.getElementById("login-form");
   const submitBtn = document.getElementById("submit-login-btn");
@@ -308,6 +297,36 @@ export const initLoginViewEvents = () => {
           showError("Unable to connect to PerfectDay. Please check your network connection.");
         } else {
           showError(err.message || "An error occurred during sign in. Please try again.");
+        }
+      }
+    });
+  }
+
+  // Google Sign-In Button Event Listener
+  const googleBtn = document.getElementById("google-signin-btn");
+  if (googleBtn) {
+    googleBtn.addEventListener("click", async () => {
+      hideError();
+      const rememberMeInput = document.getElementById("remember-me");
+      const rememberMe = Boolean(rememberMeInput?.checked);
+
+      googleBtn.disabled = true;
+      try {
+        const mockToken = `mock_google_token_google_${Date.now()}_googleuser_${Date.now()}@example.com_GoogleUser`;
+        const user = await authApi.googleAuth({ idToken: mockToken, rememberMe });
+        authStore.setUser(user);
+
+        const name = user.displayName || user.email.split("@")[0];
+        showToast({
+          message: `Welcome, ${name}!`,
+          type: "success",
+        });
+      } catch (err) {
+        googleBtn.disabled = false;
+        if (err.status === 409 || err.code === "ACCOUNT_EXISTS_PASSWORD_ONLY") {
+          showError("An account with this email already exists using password authentication. Please sign in using your password.");
+        } else {
+          showError(err.message || "Google Sign-In failed. Please try again.");
         }
       }
     });

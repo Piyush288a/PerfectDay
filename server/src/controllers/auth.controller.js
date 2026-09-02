@@ -15,6 +15,7 @@ import {
 } from "../utils/session.js";
 import { sendSuccess } from "../utils/apiResponse.js";
 import { UnauthorizedError } from "../utils/errors.js";
+import { verifyGoogleIdToken } from "../utils/googleAuth.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/auth/register
@@ -118,4 +119,41 @@ export const getMe = async (req, res) => {
   const user = await authService.getCurrentUser(req.user.userId);
 
   return sendSuccess(res, user, 200);
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/auth/google
+// Phase 8B — Continue with Google OAuth
+// ─────────────────────────────────────────────────────────────────────────────
+export const googleAuth = async (req, res) => {
+  const { idToken, rememberMe = false } = req.body;
+
+  // 1. Verify Google token & extract verified payload
+  const payload = await verifyGoogleIdToken(idToken);
+
+  // 2. Authenticate or Register via Google Service
+  const { user, isNew } = await authService.authenticateWithGoogle({
+    googleId: payload.googleId,
+    email: payload.email,
+    displayName: payload.displayName,
+  });
+
+  // 3. Issue access JWT
+  const accessToken = generateToken({ userId: user.id });
+  setAuthCookie(res, accessToken, Boolean(rememberMe));
+
+  // 4. If Remember Me is ON, create persistent refresh session
+  if (rememberMe) {
+    const rawRefreshToken = generateRefreshToken();
+    const metadata = {
+      userAgent: req.headers["user-agent"] ?? null,
+      ipAddress: req.ip ?? null,
+    };
+    await createSession(user.id, rawRefreshToken, metadata);
+    setRefreshCookie(res, rawRefreshToken);
+  } else {
+    clearRefreshCookie(res);
+  }
+
+  return sendSuccess(res, { ...user, rememberMe: Boolean(rememberMe) }, isNew ? 201 : 200);
 };

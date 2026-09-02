@@ -41,4 +41,14 @@ export const authApi = {
       method: "GET",
     });
   },
+
+  googleAuth: async ({ idToken, rememberMe = false }) => {
+    return apiClient("/api/auth/google", {
+      method: "POST",
+      body: {
+        idToken,
+        rememberMe: Boolean(rememberMe),
+      },
+    });
+  },
 };

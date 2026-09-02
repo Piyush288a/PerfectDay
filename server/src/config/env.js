@@ -19,6 +19,9 @@ const envSchema = z.object({
     .default("change-me-refresh-secret-at-least-32-chars"),
   // 30 days persistent session lifetime
   REFRESH_TOKEN_EXPIRES_DAYS: z.coerce.number().default(30),
+  // Phase 8B: Google OAuth 2.0 Credentials
+  GOOGLE_CLIENT_ID: z.string().optional().default("mock-google-client-id.apps.googleusercontent.com"),
+  GOOGLE_CLIENT_SECRET: z.string().optional().default("mock-google-client-secret"),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

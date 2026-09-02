@@ -36,3 +36,8 @@ export const loginSchema = z.object({
   // Phase 8A: Remember Me — if true, a persistent refresh token session is created
   rememberMe: z.boolean().optional().default(false),
 });
+
+export const googleAuthSchema = z.object({
+  idToken: z.string().min(1, "Google ID token is required"),
+  rememberMe: z.boolean().optional().default(false),
+});
