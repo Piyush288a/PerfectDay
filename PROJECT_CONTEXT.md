@@ -52,11 +52,13 @@ PerfectDay is a fast, elegant, keyboard-friendly personal productivity and to-do
 | **7.9.1** | Final UI Bug Fix / Visual QA Pass (Single-line Title, Truly Fixed Composer, Clean Scrollbars, Optimistic Rename). | ✅ Complete |
 | **7.9.5** | Final Fix: True Fixed App Chrome & Strict Viewport Isolation. | ✅ Complete |
 | **8A** | **Authentication Enhancements: Real Remember Me & Server-Side Session Management (DB-backed refresh tokens, rotating session cookies, silent auto-refresh).** | ✅ Complete |
-| **8B** | Continue with Google (OAuth 2.0 PKCE / Authorization Code Flow, safe account linking). | Next |
+| **8B** | Continue with Google (ID Token verification via `POST /api/auth/google`, safe account conflict protection, Remember Me support; production Google credentials deferred to D1+). | ✅ Complete (API) |
+| **D0** | **Production Deployment Contract Preparation (Environment contract, variable scoping & matrix, production migration script).** | ✅ Complete |
 | **9** | Advanced search, filtering, and sorting. | Planned |
 | **10** | Performance optimization, polish, and production release. | Planned |
 
-**Current phase:** **Phase 8A Complete**. Verified across 125 backend/integration tests (Phase 7A: 26, 7B: 25, 7C: 19, 7.5: 28, 8A: 27) and 43 browser/DOM acceptance tests.
+**Current status:** **Phase 8A, Phase 8B API, and D0 Production Deployment Contract Complete**. Verified across backend test suites, browser acceptance tests, and environment contract specifications.
+
 
 ---
 
@@ -93,3 +95,14 @@ PerfectDay is a fast, elegant, keyboard-friendly personal productivity and to-do
 - **Reminders & Push Notifications**: Scheduled for Phase 8.
 - **Recurring / Repeating Tasks**: Scheduled for Phase 8.
 - **Full Month Calendar View**: Scheduled for Phase 8 / 10.
+
+---
+
+## 5. Production Environment & Deployment Contract (D0)
+
+- **Frontend Public Config**: `VITE_API_URL` (included in client Vite bundle).
+- **Backend Runtime Config**: `NODE_ENV`, `PORT`, `CLIENT_ORIGIN`, `JWT_EXPIRES_IN`, `REFRESH_TOKEN_EXPIRES_DAYS`.
+- **Backend Secrets**: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_TOKEN_SECRET`, `GOOGLE_CLIENT_SECRET`.
+- **Google Auth Config**: `GOOGLE_CLIENT_ID` (audience verification string), `GOOGLE_CLIENT_SECRET` (backend secret fallback). Implemented via ID Token verification (`POST /api/auth/google`); production Google Cloud OAuth setup deferred to D1+.
+- **Production Database Migration Command**: `npm run prisma:migrate:deploy` (`prisma migrate deploy`).
+
