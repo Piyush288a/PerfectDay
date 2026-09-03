@@ -54,10 +54,13 @@ PerfectDay is a fast, elegant, keyboard-friendly personal productivity and to-do
 | **8A** | **Authentication Enhancements: Real Remember Me & Server-Side Session Management (DB-backed refresh tokens, rotating session cookies, silent auto-refresh).** | ✅ Complete |
 | **8B** | Continue with Google (ID Token verification via `POST /api/auth/google`, safe account conflict protection, Remember Me support; production Google credentials deferred to D1+). | ✅ Complete (API) |
 | **D0** | **Production Deployment Contract Preparation (Environment contract, variable scoping & matrix, production migration script).** | ✅ Complete |
+| **D1** | **Supabase Production Database Preparation (PostgreSQL connection, migration deployment `prisma migrate deploy`, schema verification).** | ✅ Complete |
+| **D2** | **Cloud Backend Preparation (0.0.0.0 host binding, container production start command, SIGTERM/SIGINT signal handling, health check verification).** | ✅ Complete |
 | **9** | Advanced search, filtering, and sorting. | Planned |
 | **10** | Performance optimization, polish, and production release. | Planned |
 
-**Current status:** **Phase 8A, Phase 8B API, and D0 Production Deployment Contract Complete**. Verified across backend test suites, browser acceptance tests, and environment contract specifications.
+**Current status:** **Phases 0–8A, Phase 8B API, D0 Contract, D1 Supabase DB, and D2 Cloud Backend Preparation Complete**.
+
 
 
 ---

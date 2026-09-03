@@ -82,6 +82,13 @@ npm run build # Production bundle verification
 > **Google Sign-In Implementation Contract (Phase 8B & D1+)**:
 > The backend implements Google authentication via `POST /api/auth/google`, accepting a Google ID token / Credential JWT. It verifies tokens using Google's tokeninfo endpoint (`https://oauth2.googleapis.com/tokeninfo`) or dev/test mock tokens. It does **NOT** use OAuth 2.0 PKCE / Authorization Code Flow (no redirect URI required). Production Google Cloud Console credentials and live Google Sign-In SDK button setup are explicitly deferred to the **D1+** deployment milestone.
 
+### Cloud Backend Readiness (D2 Preparation)
+- **Host Binding**: Express server explicitly binds to `"0.0.0.0"` in `server/src/index.js` to listen on all IPv4 network interfaces as required by cloud PaaS web service hosts (e.g., Render).
+- **Production Start Command**: `npm run start` executes `node src/index.js` relying on platform-injected `process.env` without requiring a `.env` file on container filesystems.
+- **Graceful Termination**: Captures `SIGTERM` and `SIGINT` signals to close open HTTP listener connections and invoke `prisma.$disconnect()` cleanly upon container shutdown.
+- **Health Monitoring**: `GET /api/health` continuously verifies application state and PostgreSQL database connection (`SELECT 1`).
+
+
 ---
 
 ## Verification Test Suites
