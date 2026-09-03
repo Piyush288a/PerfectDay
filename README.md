@@ -88,6 +88,17 @@ npm run build # Production bundle verification
 - **Graceful Termination**: Captures `SIGTERM` and `SIGINT` signals to close open HTTP listener connections and invoke `prisma.$disconnect()` cleanly upon container shutdown.
 - **Health Monitoring**: `GET /api/health` continuously verifies application state and PostgreSQL database connection (`SELECT 1`).
 
+### Frontend Deployment Readiness (D4 Preparation)
+- **Render Service Type**: Render Static Site
+- **Root Directory**: `client`
+- **Build Command**: `npm install && npm run build`
+- **Publish Directory**: `dist`
+- **Production API Configuration**: `VITE_API_URL=https://perfectday.onrender.com`
+  > [!IMPORTANT]
+  > `VITE_API_URL` is a **public build-time environment variable** compiled directly into frontend JavaScript assets during `npm run build`. It contains zero backend secrets, database connection strings, or private API keys.
+- **SPA Routing Rewrite**: Render Static Site rewrite rule `/*` -> `/index.html` (200 Rewrite) to support single-page application routing and deep link fallback.
+
+
 
 ---
 

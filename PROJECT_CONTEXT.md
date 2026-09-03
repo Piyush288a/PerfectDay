@@ -56,10 +56,13 @@ PerfectDay is a fast, elegant, keyboard-friendly personal productivity and to-do
 | **D0** | **Production Deployment Contract Preparation (Environment contract, variable scoping & matrix, production migration script).** | ✅ Complete |
 | **D1** | **Supabase Production Database Preparation (PostgreSQL connection, migration deployment `prisma migrate deploy`, schema verification).** | ✅ Complete |
 | **D2** | **Cloud Backend Preparation (0.0.0.0 host binding, container production start command, SIGTERM/SIGINT signal handling, health check verification).** | ✅ Complete |
+| **D3** | **Cloud Backend Live Deployment (Render Web Service live at `https://perfectday.onrender.com`, verified DB connectivity).** | ✅ Complete |
+| **D4** | **Frontend Production Deployment Preparation (Render Static Site config, root `client`, build command `npm run build`, `VITE_API_URL` binding, SPA rewrite contract).** | ✅ Complete |
 | **9** | Advanced search, filtering, and sorting. | Planned |
 | **10** | Performance optimization, polish, and production release. | Planned |
 
-**Current status:** **Phases 0–8A, Phase 8B API, D0 Contract, D1 Supabase DB, and D2 Cloud Backend Preparation Complete**.
+**Current status:** **Phases 0–8A, Phase 8B API, D0 Contract, D1 Supabase DB, D2 Cloud Preparation, D3 Live Backend, and D4 Frontend Preparation Complete**.
+
 
 
 
