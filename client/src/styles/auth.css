@@ -1,6 +1,11 @@
 .auth-page {
-  position: relative;
-  min-height: 100vh;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -10,6 +15,7 @@
 
 /* Header */
 .auth-header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -38,7 +44,7 @@
 
 /* Main Content: Two Column Split */
 .auth-main {
-  flex: 1;
+  flex: 1 0 auto;
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: center;
@@ -170,6 +176,7 @@
 
 /* Bottom Feature Strip */
 .auth-features-strip {
+  flex-shrink: 0;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--space-6);
@@ -233,37 +240,76 @@
 
 @media (max-width: 768px) {
   .auth-page {
-    padding: var(--space-4);
+    padding: var(--space-4) var(--space-4) var(--space-8);
   }
 
   .auth-main {
     grid-template-columns: 1fr;
-    gap: var(--space-6);
-    padding: var(--space-4) 0;
+    gap: var(--space-4);
+    padding: var(--space-2) 0 var(--space-6);
   }
 
   .auth-hero-col {
     padding-right: 0;
     text-align: center;
     align-items: center;
+    margin-bottom: var(--space-1);
   }
 
   .auth-hero-title {
-    font-size: var(--text-3xl);
-    margin-bottom: var(--space-3);
+    font-size: var(--text-2xl);
+    margin-bottom: var(--space-1);
+    line-height: 1.2;
   }
 
   .auth-hero-lead {
-    font-size: var(--text-sm);
-    margin-bottom: var(--space-4);
+    font-size: var(--text-xs);
+    margin-bottom: var(--space-2);
+    line-height: 1.4;
+  }
+
+  .auth-quote-pill {
+    font-size: 0.7rem;
+    padding: var(--space-1) var(--space-3);
   }
 
   .auth-card {
-    padding: var(--space-6) var(--space-5);
+    padding: var(--space-5) var(--space-4);
     border-radius: var(--radius-xl);
   }
 
+  .auth-form-row {
+    margin-bottom: var(--space-4);
+  }
+
+  .btn-google {
+    min-height: 42px;
+  }
+
   .auth-features-strip {
-    display: none; /* Hide bottom strip on mobile for minimal, clean form focus */
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-3);
+    padding-top: var(--space-6);
+    padding-bottom: var(--space-4);
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-page {
+    padding: var(--space-3) var(--space-3) var(--space-10);
+  }
+
+  .auth-card {
+    padding: var(--space-4) var(--space-3);
+  }
+
+  .auth-card-title {
+    font-size: var(--text-2xl);
+  }
+
+  .auth-features-strip {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
   }
 }
