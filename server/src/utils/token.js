@@ -30,7 +30,7 @@ const ACCESS_COOKIE_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
 export const getCookieOptions = (useMaxAge = true) => ({
   httpOnly: true,
   secure: env.NODE_ENV === "production",
-  sameSite: "lax",
+  sameSite: env.NODE_ENV === "production" ? "none" : "lax",
   path: "/",
   ...(useMaxAge ? { maxAge: ACCESS_COOKIE_MAX_AGE_MS } : {}),
 });
@@ -43,7 +43,7 @@ export const clearAuthCookie = (res) => {
   res.clearCookie(AUTH_COOKIE_NAME, {
     httpOnly: true,
     secure: env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: env.NODE_ENV === "production" ? "none" : "lax",
     path: "/",
   });
 };
@@ -62,7 +62,7 @@ const REFRESH_COOKIE_MAX_AGE_MS = env.REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 
 export const getRefreshCookieOptions = () => ({
   httpOnly: true,
   secure: env.NODE_ENV === "production",
-  sameSite: "lax",
+  sameSite: env.NODE_ENV === "production" ? "none" : "lax",
   path: "/api/auth", // Scope to auth routes only — reduces surface area
   maxAge: REFRESH_COOKIE_MAX_AGE_MS,
 });
@@ -75,7 +75,7 @@ export const clearRefreshCookie = (res) => {
   res.clearCookie(REFRESH_COOKIE_NAME, {
     httpOnly: true,
     secure: env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: env.NODE_ENV === "production" ? "none" : "lax",
     path: "/api/auth",
   });
 };

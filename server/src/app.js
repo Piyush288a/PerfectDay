@@ -7,6 +7,9 @@ import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
 
+// Trust reverse proxy (Render, AWS, etc.) for secure cookie handling and HTTPS detection
+app.set("trust proxy", 1);
+
 // CORS configuration
 app.use(
   cors({
