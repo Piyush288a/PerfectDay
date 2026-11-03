@@ -4,7 +4,7 @@ import { authApi } from "../api/auth.js";
  * Google Identity Services (GIS) Helper for PerfectDay
  *
  * Handles initialization, dynamic Client ID discovery (Vercel env or Render backend),
- * rendering of the official Google Sign-In button, and account credential callbacks.
+ * official Google button rendering, and the OAuth 2.0 popup account chooser.
  */
 
 let cachedClientId = null;
@@ -38,18 +38,18 @@ export const resolveGoogleClientId = async () => {
  */
 export const loadGoogleScript = () => {
   return new Promise((resolve) => {
-    if (window.google?.accounts?.id) {
-      return resolve(window.google.accounts.id);
+    if (window.google?.accounts?.id && window.google?.accounts?.oauth2) {
+      return resolve(window.google.accounts);
     }
     const existing = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
     if (existing) {
-      existing.addEventListener("load", () => resolve(window.google?.accounts?.id));
+      existing.addEventListener("load", () => resolve(window.google?.accounts));
       let attempts = 0;
       const interval = setInterval(() => {
         attempts++;
-        if (window.google?.accounts?.id || attempts > 20) {
+        if (window.google?.accounts || attempts > 20) {
           clearInterval(interval);
-          resolve(window.google?.accounts?.id);
+          resolve(window.google?.accounts);
         }
       }, 100);
       return;
@@ -58,20 +58,55 @@ export const loadGoogleScript = () => {
     script.src = "https://accounts.google.com/gsi/client";
     script.async = true;
     script.defer = true;
-    script.onload = () => resolve(window.google?.accounts?.id);
+    script.onload = () => resolve(window.google?.accounts);
     document.head.appendChild(script);
   });
 };
 
 /**
- * Initializes Google Identity Services and renders the official Google button.
- *
- * @param {Object} options
- * @param {HTMLElement|string} options.container - DOM element or selector to mount the button in
- * @param {Function} options.onSuccess - Callback receiving the ID token (credential string)
- * @param {Function} [options.onError] - Error handler
- * @param {"continue_with"|"signup_with"|"signin_with"} [options.text="continue_with"]
- * @param {number} [options.width=360]
+ * Triggers the Google OAuth 2.0 popup account chooser directly in response to a user click.
+ * Works seamlessly across all desktop & mobile browsers.
+ */
+export const triggerGooglePopup = async ({ onSuccess, onError }) => {
+  const clientId = await resolveGoogleClientId();
+  if (!clientId) {
+    if (onError) onError(new Error("Google Client ID is not configured. Please check Render or Vercel settings."));
+    return;
+  }
+
+  const accounts = await loadGoogleScript();
+  if (!accounts?.oauth2) {
+    if (onError) onError(new Error("Google Identity Services is loading. Please try again."));
+    return;
+  }
+
+  try {
+    const tokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: "openid email profile",
+      callback: (tokenResponse) => {
+        if (tokenResponse.error) {
+          const desc = tokenResponse.error_description || tokenResponse.error;
+          if (onError) onError(new Error(desc));
+          return;
+        }
+        if (tokenResponse.access_token) {
+          onSuccess({ accessToken: tokenResponse.access_token });
+        }
+      },
+      error_callback: (err) => {
+        if (onError) onError(new Error(err?.message || "Google Sign-In popup closed."));
+      },
+    });
+
+    tokenClient.requestAccessToken({ prompt: "select_account" });
+  } catch (err) {
+    if (onError) onError(err);
+  }
+};
+
+/**
+ * Initializes Google Identity Services and mounts the button.
  */
 export const mountGoogleSignInButton = async ({
   container,
@@ -88,18 +123,18 @@ export const mountGoogleSignInButton = async ({
     return false;
   }
 
-  const googleId = await loadGoogleScript();
-  if (!googleId) {
+  const accounts = await loadGoogleScript();
+  if (!accounts?.id) {
     if (onError) onError(new Error("Unable to load Google Identity Services SDK"));
     return false;
   }
 
   try {
-    googleId.initialize({
+    accounts.id.initialize({
       client_id: clientId,
       callback: (response) => {
         if (response?.credential) {
-          onSuccess(response.credential);
+          onSuccess({ idToken: response.credential });
         } else if (onError) {
           onError(new Error("No credential returned from Google."));
         }
@@ -112,7 +147,7 @@ export const mountGoogleSignInButton = async ({
 
     // Clear placeholder and mount official Google button
     containerEl.innerHTML = "";
-    googleId.renderButton(containerEl, {
+    accounts.id.renderButton(containerEl, {
       type: "standard",
       theme: isDarkMode ? "filled_black" : "outline",
       size: "large",

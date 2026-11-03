@@ -15,7 +15,7 @@ import {
 } from "../utils/session.js";
 import { sendSuccess } from "../utils/apiResponse.js";
 import { UnauthorizedError } from "../utils/errors.js";
-import { verifyGoogleIdToken } from "../utils/googleAuth.js";
+import { verifyGoogleIdToken, verifyGoogleToken } from "../utils/googleAuth.js";
 import { env } from "../config/env.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -127,10 +127,10 @@ export const getMe = async (req, res) => {
 // Phase 8B — Continue with Google OAuth
 // ─────────────────────────────────────────────────────────────────────────────
 export const googleAuth = async (req, res) => {
-  const { idToken, rememberMe = false } = req.body;
+  const { idToken, accessToken: googleAccessToken, rememberMe = false } = req.body;
 
   // 1. Verify Google token & extract verified payload
-  const payload = await verifyGoogleIdToken(idToken);
+  const payload = await verifyGoogleToken({ idToken, accessToken: googleAccessToken });
 
   // 2. Authenticate or Register via Google Service
   const { user, isNew } = await authService.authenticateWithGoogle({

@@ -37,7 +37,12 @@ export const loginSchema = z.object({
   rememberMe: z.boolean().optional().default(false),
 });
 
-export const googleAuthSchema = z.object({
-  idToken: z.string().min(1, "Google ID token is required"),
-  rememberMe: z.boolean().optional().default(false),
-});
+export const googleAuthSchema = z
+  .object({
+    idToken: z.string().optional(),
+    accessToken: z.string().optional(),
+    rememberMe: z.boolean().optional().default(false),
+  })
+  .refine((data) => Boolean(data.idToken || data.accessToken), {
+    message: "Either idToken or accessToken is required",
+  });

@@ -42,11 +42,12 @@ export const authApi = {
     });
   },
 
-  googleAuth: async ({ idToken, rememberMe = false }) => {
+  googleAuth: async ({ idToken, accessToken, rememberMe = false }) => {
     return apiClient("/api/auth/google", {
       method: "POST",
       body: {
-        idToken,
+        ...(idToken ? { idToken } : {}),
+        ...(accessToken ? { accessToken } : {}),
         rememberMe: Boolean(rememberMe),
       },
     });

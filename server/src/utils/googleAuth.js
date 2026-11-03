@@ -9,17 +9,43 @@ import { UnauthorizedError } from "./errors.js";
  *
  * Supports mock verification in test environments or when mock tokens are provided.
  */
-export async function verifyGoogleIdToken(idToken) {
-  if (!idToken || typeof idToken !== "string") {
-    throw new UnauthorizedError("Google ID token is required");
+export async function verifyGoogleToken({ idToken, accessToken }) {
+  const token = idToken || accessToken;
+  if (!token || typeof token !== "string") {
+    throw new UnauthorizedError("Google token is required");
   }
 
   // 1. Mock / Integration Test Token Verification
-  if (idToken.startsWith("mock_google_token_") || idToken.startsWith("mock_") || env.NODE_ENV === "test") {
-    return parseMockGoogleToken(idToken);
+  if (token.startsWith("mock_google_token_") || token.startsWith("mock_") || env.NODE_ENV === "test") {
+    return parseMockGoogleToken(token);
   }
 
-  // 2. Real Production/Dev Google Token Verification via OAuth2 TokenInfo endpoint
+  // 2. Access Token Verification via Google Userinfo API
+  if (accessToken) {
+    try {
+      const response = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!response.ok) {
+        throw new UnauthorizedError("Google access token verification failed");
+      }
+      const payload = await response.json();
+      if (payload.email_verified === false || payload.email_verified === "false") {
+        throw new UnauthorizedError("Google email is not verified");
+      }
+      return {
+        googleId: payload.sub,
+        email: payload.email,
+        displayName: payload.name ?? payload.email.split("@")[0],
+        avatarUrl: payload.picture ?? null,
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedError) throw error;
+      throw new UnauthorizedError(`Failed to verify Google access token: ${error.message}`);
+    }
+  }
+
+  // 3. Real Production/Dev Google ID Token Verification via OAuth2 TokenInfo endpoint
   try {
     const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
     if (!response.ok) {
@@ -51,6 +77,8 @@ export async function verifyGoogleIdToken(idToken) {
     throw new UnauthorizedError(`Failed to verify Google token: ${error.message}`);
   }
 }
+
+export const verifyGoogleIdToken = (idToken) => verifyGoogleToken({ idToken });
 
 /**
  * Helper to parse test mock tokens of format:

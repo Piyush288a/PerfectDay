@@ -3,7 +3,7 @@ import { renderAmbientSceneHTML } from "../components/AmbientScene.js";
 import { showToast } from "../components/Toast.js";
 import { authApi } from "../api/auth.js";
 import { authStore } from "../store/auth.js";
-import { mountGoogleSignInButton, resolveGoogleClientId } from "../utils/googleAuth.js";
+import { mountGoogleSignInButton, resolveGoogleClientId, triggerGooglePopup } from "../utils/googleAuth.js";
 
 export const renderRegisterView = () => `
   <div class="auth-page">
@@ -330,11 +330,12 @@ export const initRegisterViewEvents = () => {
   // Google Sign-Up Event Handling
   const googleBtn = document.getElementById("google-signup-btn");
 
-  const handleGoogleAuthSuccess = async (idToken) => {
+  const handleGoogleAuthSuccess = async (tokenData) => {
     hideError();
+    const payload = typeof tokenData === "string" ? { idToken: tokenData } : tokenData;
     if (googleBtn) googleBtn.disabled = true;
     try {
-      const user = await authApi.googleAuth({ idToken, rememberMe: false });
+      const user = await authApi.googleAuth({ ...payload, rememberMe: false });
       authStore.setUser(user);
 
       const name = user.displayName || user.email.split("@")[0];
@@ -363,26 +364,16 @@ export const initRegisterViewEvents = () => {
     },
   });
 
-  // Click listener for button
+  // Direct Popup Trigger for Custom Button
   if (googleBtn) {
     googleBtn.addEventListener("click", async () => {
       hideError();
-      const clientId = await resolveGoogleClientId();
-      if (!clientId) {
-        showError("Google Client ID is not detected. Please verify that GOOGLE_CLIENT_ID is set in Render or VITE_GOOGLE_CLIENT_ID in Vercel.");
-        return;
-      }
-
-      if (window.google?.accounts?.id) {
-        window.google.accounts.id.prompt((notification) => {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            showError("Google Sign-In prompt was not displayed by your browser. Please check browser popups or third-party cookies.");
-          }
-        });
-        return;
-      }
-
-      showError("Google Identity Services is loading. Please try again in a moment.");
+      await triggerGooglePopup({
+        onSuccess: handleGoogleAuthSuccess,
+        onError: (err) => {
+          showError(err.message || "Google Sign-Up was cancelled or encountered an error.");
+        },
+      });
     });
   }
 };
