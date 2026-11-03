@@ -3,6 +3,7 @@ import { renderAmbientSceneHTML } from "../components/AmbientScene.js";
 import { showToast } from "../components/Toast.js";
 import { authApi } from "../api/auth.js";
 import { authStore } from "../store/auth.js";
+import { mountGoogleSignInButton } from "../utils/googleAuth.js";
 
 export const renderLoginView = () => `
   <div class="auth-page">
@@ -126,16 +127,18 @@ export const renderLoginView = () => `
             <span>or</span>
           </div>
 
-          <!-- Google Sign-In Button -->
-          <button type="button" id="google-signin-btn" class="btn btn-google" title="Continue with Google">
-            <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
-              <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.616z" fill="#4285F4"/>
-              <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
-              <path d="M3.964 10.707c-.18-.54-.282-1.117-.282-1.707 0-.59.102-1.167.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" fill="#FBBC05"/>
-              <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 7.293C4.672 5.166 6.656 3.58 9 3.58z" fill="#EA4335"/>
-            </svg>
-            <span>Continue with Google</span>
-          </button>
+          <!-- Google Sign-In Container -->
+          <div id="google-signin-container" style="display: flex; justify-content: center; width: 100%; min-height: 44px;">
+            <button type="button" id="google-signin-btn" class="btn btn-google" title="Continue with Google" style="width: 100%;">
+              <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.616z" fill="#4285F4"/>
+                <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+                <path d="M3.964 10.707c-.18-.54-.282-1.117-.282-1.707 0-.59.102-1.167.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" fill="#FBBC05"/>
+                <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 7.293C4.672 5.166 6.656 3.58 9 3.58z" fill="#EA4335"/>
+              </svg>
+              <span>Continue with Google</span>
+            </button>
+          </div>
 
           <!-- Footer Switch -->
           <div class="auth-card-footer">
@@ -302,33 +305,54 @@ export const initLoginViewEvents = () => {
     });
   }
 
-  // Google Sign-In Button Event Listener
+  // Google Sign-In Event Handling
   const googleBtn = document.getElementById("google-signin-btn");
+
+  const handleGoogleAuthSuccess = async (idToken) => {
+    hideError();
+    const rememberMeInput = document.getElementById("remember-me");
+    const rememberMe = Boolean(rememberMeInput?.checked);
+
+    if (googleBtn) googleBtn.disabled = true;
+    try {
+      const user = await authApi.googleAuth({ idToken, rememberMe });
+      authStore.setUser(user);
+
+      const name = user.displayName || user.email.split("@")[0];
+      showToast({
+        message: `Welcome, ${name}!`,
+        type: "success",
+      });
+      window.location.hash = "#app";
+    } catch (err) {
+      if (googleBtn) googleBtn.disabled = false;
+      if (err.status === 409 || err.code === "ACCOUNT_EXISTS_PASSWORD_ONLY") {
+        showError("An account with this email already exists using password authentication. Please sign in using your password.");
+      } else {
+        showError(err.message || "Google Sign-In failed. Please try again.");
+      }
+    }
+  };
+
+  // Mount official Google Sign-In button if VITE_GOOGLE_CLIENT_ID is configured
+  mountGoogleSignInButton({
+    container: "#google-signin-container",
+    text: "continue_with",
+    onSuccess: handleGoogleAuthSuccess,
+    onError: (err) => {
+      console.warn("Google Sign-In:", err.message);
+    },
+  });
+
+  // Fallback click listener for custom button / dev / mock environments
   if (googleBtn) {
     googleBtn.addEventListener("click", async () => {
-      hideError();
-      const rememberMeInput = document.getElementById("remember-me");
-      const rememberMe = Boolean(rememberMeInput?.checked);
-
-      googleBtn.disabled = true;
-      try {
-        const mockToken = `mock_google_token_google_${Date.now()}_googleuser_${Date.now()}@example.com_GoogleUser`;
-        const user = await authApi.googleAuth({ idToken: mockToken, rememberMe });
-        authStore.setUser(user);
-
-        const name = user.displayName || user.email.split("@")[0];
-        showToast({
-          message: `Welcome, ${name}!`,
-          type: "success",
-        });
-      } catch (err) {
-        googleBtn.disabled = false;
-        if (err.status === 409 || err.code === "ACCOUNT_EXISTS_PASSWORD_ONLY") {
-          showError("An account with this email already exists using password authentication. Please sign in using your password.");
-        } else {
-          showError(err.message || "Google Sign-In failed. Please try again.");
-        }
+      if (window.google?.accounts?.id) {
+        window.google.accounts.id.prompt();
+        return;
       }
+      const mockToken = `mock_google_token_google_${Date.now()}_googleuser_${Date.now()}@example.com_GoogleUser`;
+      await handleGoogleAuthSuccess(mockToken);
     });
   }
 };
