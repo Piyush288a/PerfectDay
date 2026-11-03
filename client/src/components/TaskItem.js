@@ -1,4 +1,5 @@
 import { showNotesPopover } from "./NotesPopover.js";
+import { parseLocalDate, getTodayLocal, formatDateDisplay } from "../utils/date.js";
 
 export const renderTaskItemHTML = (task, activeView, lists = [], selectedTaskId = null) => {
   const isHighPriority = task.priority === "HIGH";
@@ -8,21 +9,17 @@ export const renderTaskItemHTML = (task, activeView, lists = [], selectedTaskId 
   // Format due date if available
   let dueDateHTML = "";
   if (task.dueDate) {
-    const d = new Date(task.dueDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const d = parseLocalDate(task.dueDate);
+    const today = getTodayLocal();
 
-    const checkDate = new Date(d);
-    checkDate.setHours(0, 0, 0, 0);
-
-    let dateText = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    let dateText = formatDateDisplay(d, { month: "short", day: "numeric" });
     let isOverdue = false;
     let isToday = false;
 
-    if (checkDate.getTime() === today.getTime()) {
+    if (d && d.getTime() === today.getTime()) {
       dateText = "Today";
       isToday = true;
-    } else if (checkDate.getTime() < today.getTime() && !isCompleted) {
+    } else if (d && d.getTime() < today.getTime() && !isCompleted) {
       isOverdue = true;
     }
 

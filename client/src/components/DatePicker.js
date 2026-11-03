@@ -1,4 +1,5 @@
 import { initIcons } from "../utils/icons.js";
+import { parseLocalDate, formatDateISO, getTodayLocal } from "../utils/date.js";
 
 export const showDatePicker = ({
   anchorEl,
@@ -10,18 +11,15 @@ export const showDatePicker = ({
   closeDatePicker();
 
   // Normalize today at midnight
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  // Initial viewing month/year
-  let viewDate = currentDate ? new Date(currentDate) : new Date();
-  if (isNaN(viewDate.getTime())) viewDate = new Date();
-  let currentMonth = viewDate.getMonth();
-  let currentYear = viewDate.getFullYear();
+  const today = getTodayLocal();
 
   // Selected date object
-  let selectedDateObj = currentDate ? new Date(currentDate) : null;
-  if (selectedDateObj && isNaN(selectedDateObj.getTime())) selectedDateObj = null;
+  let selectedDateObj = parseLocalDate(currentDate);
+
+  // Initial viewing month/year
+  let viewDate = selectedDateObj || getTodayLocal();
+  let currentMonth = viewDate.getMonth();
+  let currentYear = viewDate.getFullYear();
 
   const popover = document.createElement("div");
   popover.id = "pd-datepicker-popover";
@@ -41,9 +39,7 @@ export const showDatePicker = ({
     // Check if task is overdue
     let isOverdue = false;
     if (selectedDateObj) {
-      const checkSel = new Date(selectedDateObj);
-      checkSel.setHours(0, 0, 0, 0);
-      if (checkSel.getTime() < today.getTime()) {
+      if (selectedDateObj.getTime() < today.getTime()) {
         isOverdue = true;
       }
     }
@@ -56,8 +52,7 @@ export const showDatePicker = ({
 
     // Days in current month
     for (let day = 1; day <= daysInMonth; day++) {
-      const thisDate = new Date(currentYear, currentMonth, day);
-      thisDate.setHours(0, 0, 0, 0);
+      const thisDate = new Date(currentYear, currentMonth, day, 0, 0, 0, 0);
 
       const isPast = thisDate.getTime() < today.getTime();
       const isToday = thisDate.getTime() === today.getTime();
@@ -66,7 +61,7 @@ export const showDatePicker = ({
         selectedDateObj.getMonth() === currentMonth &&
         selectedDateObj.getDate() === day;
 
-      const dateISO = thisDate.toISOString().split("T")[0];
+      const dateISO = formatDateISO(thisDate);
 
       // Past dates are disabled for normal scheduling unless it is the existing selected overdue date
       const isDisabled = isPast && !isSelected;
@@ -145,7 +140,7 @@ export const showDatePicker = ({
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
         const action = btn.dataset.quick;
-        let d = new Date();
+        let d = getTodayLocal();
         if (action === "today") {
           // today
         } else if (action === "tomorrow") {
@@ -153,7 +148,7 @@ export const showDatePicker = ({
         } else if (action === "next-week") {
           d.setDate(d.getDate() + 7);
         }
-        const iso = d.toISOString().split("T")[0];
+        const iso = formatDateISO(d);
         onSelect(iso);
         closeDatePicker();
       });
@@ -188,8 +183,15 @@ export const showDatePicker = ({
   renderCalendar();
   document.body.appendChild(popover);
 
-  // Position popover relative to anchorEl
-  if (anchorEl) {
+  // Position popover relative to anchorEl (or centered on mobile screens)
+  if (window.innerWidth <= 640) {
+    popover.style.position = "fixed";
+    popover.style.top = "50%";
+    popover.style.left = "50%";
+    popover.style.transform = "translate(-50%, -50%)";
+    popover.style.zIndex = "2500";
+    popover.style.maxWidth = "calc(100vw - 32px)";
+  } else if (anchorEl) {
     const rect = anchorEl.getBoundingClientRect();
     const popoverHeight = 320;
     const popoverWidth = 280;

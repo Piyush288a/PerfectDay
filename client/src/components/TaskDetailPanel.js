@@ -4,6 +4,7 @@ import { showConfirmModal } from "./Modal.js";
 import { showToast } from "./Toast.js";
 import { showDatePicker, closeDatePicker } from "./DatePicker.js";
 import { initIcons } from "../utils/icons.js";
+import { parseLocalDate, getTodayLocal, formatDateDisplay } from "../utils/date.js";
 
 export const renderTaskDetailPanelHTML = (task, lists = []) => {
   if (!task) return "";
@@ -17,18 +18,14 @@ export const renderTaskDetailPanelHTML = (task, lists = []) => {
   let isToday = false;
 
   if (task.dueDate) {
-    const d = new Date(task.dueDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const d = parseLocalDate(task.dueDate);
+    const today = getTodayLocal();
 
-    const checkDate = new Date(d);
-    checkDate.setHours(0, 0, 0, 0);
-
-    const formatted = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    if (checkDate.getTime() === today.getTime()) {
+    const formatted = formatDateDisplay(d, { month: "short", day: "numeric", year: "numeric" });
+    if (d && d.getTime() === today.getTime()) {
       dueDateText = "Today";
       isToday = true;
-    } else if (checkDate.getTime() < today.getTime() && !isCompleted) {
+    } else if (d && d.getTime() < today.getTime() && !isCompleted) {
       dueDateText = `Overdue: ${formatted}`;
       isOverdue = true;
     } else {

@@ -748,4 +748,11 @@
   color: #FFFFFF;
 }
 
+@media (max-width: 640px) {
+  .datepicker-popover {
+    width: min(320px, calc(100vw - 32px)) !important;
+  }
+}
+
+
 

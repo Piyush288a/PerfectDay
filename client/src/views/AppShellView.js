@@ -11,6 +11,7 @@ import { showProfilePopover } from "../components/ProfilePopover.js";
 import { closeDatePicker } from "../components/DatePicker.js";
 import { renderAmbientSceneHTML } from "../components/AmbientScene.js";
 import { initIcons } from "../utils/icons.js";
+import { parseLocalDate, formatDateISO, getTodayLocal, getTomorrowLocal, formatDateDisplay } from "../utils/date.js";
 
 let unsubscribeListStore = null;
 let unsubscribeTaskStore = null;
@@ -273,6 +274,9 @@ export const renderAppShellView = () => {
         </div>
       </aside>
 
+      <!-- Mobile Sidebar Backdrop -->
+      <div class="sidebar-backdrop" id="sidebar-backdrop" aria-hidden="true"></div>
+
       <!-- Main Workspace -->
       <main class="shell-workspace ${currentView === "planned" ? "planned-mode" : ""}" id="shell-workspace">
         <div class="workspace-header">
@@ -356,11 +360,8 @@ const renderStandardTaskList = (tasks, currentView, lists, selectedTaskId) => {
 
 // Render Planned View (Horizontal Date Columns)
 const renderPlannedHorizontalView = (tasks, lists, selectedTaskId) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const today = getTodayLocal();
+  const tomorrow = getTomorrowLocal();
 
   // Group tasks by category/date
   const overdueTasks = [];
@@ -380,9 +381,13 @@ const renderPlannedHorizontalView = (tasks, lists, selectedTaskId) => {
       return;
     }
 
-    const d = new Date(task.dueDate);
-    d.setHours(0, 0, 0, 0);
-    const iso = d.toISOString().split("T")[0];
+    const d = parseLocalDate(task.dueDate);
+    if (!d) {
+      noDateTasks.push(task);
+      return;
+    }
+
+    const iso = formatDateISO(d);
 
     if (d.getTime() < today.getTime() && !task.isCompleted) {
       overdueTasks.push(task);
@@ -460,8 +465,8 @@ const renderPlannedHorizontalView = (tasks, lists, selectedTaskId) => {
 
   // 4. Upcoming Day Columns
   sortedUpcomingDates.forEach((dateISO) => {
-    const d = new Date(dateISO);
-    const dayName = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    const d = parseLocalDate(dateISO);
+    const dayName = formatDateDisplay(d, { weekday: "short", month: "short", day: "numeric" });
     const colTasks = upcomingMap.get(dateISO) || [];
 
     html += `
@@ -501,11 +506,8 @@ const renderPlannedHorizontalView = (tasks, lists, selectedTaskId) => {
 
 // Render Master/Detail Tasks View
 const renderMasterDetailTasksView = (tasks, lists, selectedTaskId) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const today = getTodayLocal();
+  const tomorrow = getTomorrowLocal();
 
   const overdue = [];
   const todayTasks = [];
@@ -530,8 +532,11 @@ const renderMasterDetailTasksView = (tasks, lists, selectedTaskId) => {
       return;
     }
 
-    const d = new Date(t.dueDate);
-    d.setHours(0, 0, 0, 0);
+    const d = parseLocalDate(t.dueDate);
+    if (!d) {
+      noDateTasks.push(t);
+      return;
+    }
 
     if (d.getTime() < today.getTime()) {
       overdue.push(t);
@@ -658,7 +663,7 @@ const updateDetailPanel = () => {
 
     const dateText = panel.querySelector("#detail-date-display-text");
     if (dateText && selectedTask.dueDate) {
-      dateText.textContent = new Date(selectedTask.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      dateText.textContent = formatDateDisplay(selectedTask.dueDate, { month: "short", day: "numeric", year: "numeric" });
     }
     return;
   }
@@ -754,17 +759,27 @@ export const initAppShellEvents = () => {
   const sidebar = document.getElementById("shell-sidebar");
   const shellBody = document.querySelector(".shell-body");
   const toggleBtn = document.getElementById("sidebar-toggle");
+  const backdrop = document.getElementById("sidebar-backdrop");
 
   // Sidebar Toggle (Mobile Drawer & Desktop Rail Collapse)
   if (toggleBtn && sidebar) {
     toggleBtn.addEventListener("click", () => {
       if (window.innerWidth <= 768) {
-        sidebar.classList.toggle("open");
+        const isOpen = sidebar.classList.toggle("open");
+        if (backdrop) backdrop.classList.toggle("active", isOpen);
       } else {
         isSidebarCollapsed = !isSidebarCollapsed;
         sidebar.classList.toggle("collapsed", isSidebarCollapsed);
         if (shellBody) shellBody.classList.toggle("collapsed-nav", isSidebarCollapsed);
       }
+    });
+  }
+
+  // Backdrop click closes mobile sidebar
+  if (backdrop && sidebar) {
+    backdrop.addEventListener("click", () => {
+      sidebar.classList.remove("open");
+      backdrop.classList.remove("active");
     });
   }
 
@@ -902,6 +917,7 @@ export const initAppShellEvents = () => {
         // Close sidebar on mobile
         if (window.innerWidth <= 768 && sidebar) {
           sidebar.classList.remove("open");
+          if (backdrop) backdrop.classList.remove("active");
         }
 
         taskStore.closeDetail();
@@ -997,11 +1013,11 @@ export const initAppShellEvents = () => {
       const taskPayload = { title };
 
       if (currentView === "my-day") {
-        taskPayload.myDayOn = new Date().toISOString().split("T")[0];
+        taskPayload.myDayOn = formatDateISO(getTodayLocal());
       } else if (currentView === "important") {
         taskPayload.priority = "HIGH";
       } else if (currentView === "planned") {
-        taskPayload.dueDate = new Date().toISOString().split("T")[0];
+        taskPayload.dueDate = formatDateISO(getTodayLocal());
       } else if (currentView !== "all-tasks") {
         // Custom list ID
         taskPayload.listId = currentView;
