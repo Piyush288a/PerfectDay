@@ -1,12 +1,36 @@
+import { authApi } from "../api/auth.js";
+
 /**
  * Google Identity Services (GIS) Helper for PerfectDay
  *
- * Handles initialization, rendering of the official Google Sign-In button,
- * and account credential callbacks.
+ * Handles initialization, dynamic Client ID discovery (Vercel env or Render backend),
+ * rendering of the official Google Sign-In button, and account credential callbacks.
  */
 
-export const getGoogleClientId = () => {
-  return (typeof import.meta !== "undefined" && import.meta.env?.VITE_GOOGLE_CLIENT_ID) || "";
+let cachedClientId = null;
+
+export const resolveGoogleClientId = async () => {
+  if (cachedClientId) return cachedClientId;
+
+  // 1. Check client-side build-time environment variable (Vercel)
+  const buildTimeId = (typeof import.meta !== "undefined" && import.meta.env?.VITE_GOOGLE_CLIENT_ID) || "";
+  if (buildTimeId && buildTimeId !== "mock-google-client-id.apps.googleusercontent.com") {
+    cachedClientId = buildTimeId;
+    return cachedClientId;
+  }
+
+  // 2. Fallback: Dynamically query backend auth config (Render)
+  try {
+    const config = await authApi.getConfig();
+    if (config?.googleClientId) {
+      cachedClientId = config.googleClientId;
+      return cachedClientId;
+    }
+  } catch (err) {
+    console.warn("Unable to fetch auth config from backend:", err.message);
+  }
+
+  return "";
 };
 
 /**
@@ -56,7 +80,10 @@ export const mountGoogleSignInButton = async ({
   text = "continue_with",
   width = 360,
 }) => {
-  const clientId = getGoogleClientId();
+  const containerEl = typeof container === "string" ? document.querySelector(container) : container;
+  if (!containerEl) return false;
+
+  const clientId = await resolveGoogleClientId();
   if (!clientId) {
     return false;
   }
@@ -66,9 +93,6 @@ export const mountGoogleSignInButton = async ({
     if (onError) onError(new Error("Unable to load Google Identity Services SDK"));
     return false;
   }
-
-  const containerEl = typeof container === "string" ? document.querySelector(container) : container;
-  if (!containerEl) return false;
 
   try {
     googleId.initialize({
@@ -86,6 +110,8 @@ export const mountGoogleSignInButton = async ({
 
     const isDarkMode = document.documentElement.getAttribute("data-theme") === "dark";
 
+    // Clear placeholder and mount official Google button
+    containerEl.innerHTML = "";
     googleId.renderButton(containerEl, {
       type: "standard",
       theme: isDarkMode ? "filled_black" : "outline",

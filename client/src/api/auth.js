@@ -51,4 +51,10 @@ export const authApi = {
       },
     });
   },
+
+  getConfig: async () => {
+    return apiClient("/api/auth/config", {
+      method: "GET",
+    });
+  },
 };

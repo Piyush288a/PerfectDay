@@ -17,4 +17,7 @@ router.post("/refresh", authController.refresh);
 // Phase 8B — Continue with Google OAuth
 router.post("/google",  validate({ body: googleAuthSchema }), authController.googleAuth);
 
+// Public Auth Configuration (e.g. Google Client ID)
+router.get("/config", authController.getAuthConfig);
+
 export default router;

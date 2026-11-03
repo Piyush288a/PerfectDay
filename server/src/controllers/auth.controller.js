@@ -16,6 +16,7 @@ import {
 import { sendSuccess } from "../utils/apiResponse.js";
 import { UnauthorizedError } from "../utils/errors.js";
 import { verifyGoogleIdToken } from "../utils/googleAuth.js";
+import { env } from "../config/env.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/auth/register
@@ -156,4 +157,17 @@ export const googleAuth = async (req, res) => {
   }
 
   return sendSuccess(res, { ...user, rememberMe: Boolean(rememberMe) }, isNew ? 201 : 200);
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/auth/config
+// Exposes public auth configuration (e.g. Google Client ID) to clients
+// ─────────────────────────────────────────────────────────────────────────────
+export const getAuthConfig = (req, res) => {
+  const googleClientId =
+    env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_ID !== "mock-google-client-id.apps.googleusercontent.com"
+      ? env.GOOGLE_CLIENT_ID
+      : "";
+
+  return sendSuccess(res, { googleClientId }, 200);
 };

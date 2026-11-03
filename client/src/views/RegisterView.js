@@ -3,7 +3,7 @@ import { renderAmbientSceneHTML } from "../components/AmbientScene.js";
 import { showToast } from "../components/Toast.js";
 import { authApi } from "../api/auth.js";
 import { authStore } from "../store/auth.js";
-import { mountGoogleSignInButton } from "../utils/googleAuth.js";
+import { mountGoogleSignInButton, resolveGoogleClientId } from "../utils/googleAuth.js";
 
 export const renderRegisterView = () => `
   <div class="auth-page">
@@ -363,15 +363,26 @@ export const initRegisterViewEvents = () => {
     },
   });
 
-  // Fallback click listener for custom button / dev / mock environments
+  // Click listener for button
   if (googleBtn) {
     googleBtn.addEventListener("click", async () => {
-      if (window.google?.accounts?.id) {
-        window.google.accounts.id.prompt();
+      hideError();
+      const clientId = await resolveGoogleClientId();
+      if (!clientId) {
+        showError("Google Client ID is not detected. Please verify that GOOGLE_CLIENT_ID is set in Render or VITE_GOOGLE_CLIENT_ID in Vercel.");
         return;
       }
-      const mockToken = `mock_google_token_google_${Date.now()}_googleuser_${Date.now()}@example.com_GoogleUser`;
-      await handleGoogleAuthSuccess(mockToken);
+
+      if (window.google?.accounts?.id) {
+        window.google.accounts.id.prompt((notification) => {
+          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            showError("Google Sign-In prompt was not displayed by your browser. Please check browser popups or third-party cookies.");
+          }
+        });
+        return;
+      }
+
+      showError("Google Identity Services is loading. Please try again in a moment.");
     });
   }
 };
