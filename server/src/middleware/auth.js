@@ -23,11 +23,21 @@ import { UnauthorizedError } from "../utils/errors.js";
  *   4. If any step fails → throw UnauthorizedError (→ 401).
  */
 export const requireAuth = async (req, res, next) => {
-  const token = extractTokenFromCookie(req);
+  // 1. Try to extract token from Authorization header (Bearer <token>)
+  let token = null;
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.slice(7).trim();
+  }
+
+  // 2. If no header, extract token from pd_auth cookie
+  if (!token) {
+    token = extractTokenFromCookie(req);
+  }
 
   if (!token) {
     // No access token at all — check for refresh token before giving up
-    const rawRefresh = extractRefreshTokenFromCookie(req);
+    const rawRefresh = extractRefreshTokenFromCookie(req) || req.headers["x-refresh-token"] || req.body?.refreshToken;
     if (rawRefresh) {
       return attemptRefresh(req, res, next, rawRefresh);
     }
@@ -46,7 +56,7 @@ export const requireAuth = async (req, res, next) => {
   } catch (error) {
     if (error.name === "TokenExpiredError" || error.name === "JsonWebTokenError") {
       // Access token expired or invalid — try to silently refresh using pd_refresh
-      const rawRefresh = extractRefreshTokenFromCookie(req);
+      const rawRefresh = extractRefreshTokenFromCookie(req) || req.headers["x-refresh-token"] || req.body?.refreshToken;
       if (rawRefresh) {
         return attemptRefresh(req, res, next, rawRefresh);
       }
@@ -81,6 +91,9 @@ const attemptRefresh = async (req, res, next, rawRefresh) => {
 
     // Set rotated refresh cookie
     setRefreshCookie(res, newRawToken);
+
+    // Expose new access token in response header for clients using Bearer auth
+    res.setHeader("X-New-Access-Token", newAccessToken);
 
     req.user = { userId };
     return next();

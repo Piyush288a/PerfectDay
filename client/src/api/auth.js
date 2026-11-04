@@ -24,15 +24,17 @@ export const authApi = {
     });
   },
 
-  refreshSession: async () => {
+  refreshSession: async ({ refreshToken } = {}) => {
     return apiClient("/api/auth/refresh", {
       method: "POST",
+      body: refreshToken ? { refreshToken } : undefined,
     });
   },
 
-  logout: async () => {
+  logout: async ({ refreshToken } = {}) => {
     return apiClient("/api/auth/logout", {
       method: "POST",
+      body: refreshToken ? { refreshToken } : undefined,
     });
   },
 

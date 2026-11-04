@@ -1,4 +1,5 @@
 import { authApi } from "../api/auth.js";
+import { setStoredToken, setStoredRefreshToken, getStoredRefreshToken } from "../api/client.js";
 import { taskStore } from "./tasks.js";
 import { listStore } from "./lists.js";
 
@@ -23,6 +24,13 @@ class AuthStore {
       listStore.reset();
     }
 
+    if (user?.token) {
+      setStoredToken(user.token);
+    }
+    if (user?.refreshToken) {
+      setStoredRefreshToken(user.refreshToken);
+    }
+
     this.state = {
       status: "authenticated",
       user,
@@ -31,6 +39,10 @@ class AuthStore {
   }
 
   clearUser() {
+    // Reset stored authentication tokens
+    setStoredToken(null);
+    setStoredRefreshToken(null);
+
     // Reset all user-specific state upon clearing session/logout
     taskStore.reset();
     listStore.reset();
@@ -43,23 +55,35 @@ class AuthStore {
   }
 
   async checkSession() {
+    const storedRefresh = getStoredRefreshToken();
+
     try {
       const user = await authApi.getMe();
       if (user && user.id) {
         this.setUser(user);
         return user;
       }
-      this.clearUser();
-      return null;
-    } catch {
-      this.clearUser();
-      return null;
+    } catch (err) {
+      // If getMe fails and a stored refresh token exists, attempt transparent recovery
+      if (storedRefresh) {
+        try {
+          const refreshed = await authApi.refreshSession({ refreshToken: storedRefresh });
+          if (refreshed && refreshed.id) {
+            this.setUser(refreshed);
+            return refreshed;
+          }
+        } catch {}
+      }
     }
+
+    this.clearUser();
+    return null;
   }
 
   async logout() {
+    const storedRefresh = getStoredRefreshToken();
     try {
-      await authApi.logout();
+      await authApi.logout({ refreshToken: storedRefresh });
     } catch (err) {
       console.warn("Logout request completed with warning:", err.message);
     } finally {

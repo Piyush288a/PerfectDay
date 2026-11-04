@@ -28,7 +28,7 @@ export const register = async (req, res) => {
   // Registration always uses a session cookie (no Remember Me on register)
   setAuthCookie(res, token, false);
 
-  return sendSuccess(res, user, 201);
+  return sendSuccess(res, { ...user, token }, 201);
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,6 +40,7 @@ export const login = async (req, res) => {
 
   const user = await authService.loginUser(req.body);
   const token = generateToken({ userId: user.id });
+  let rawRefreshToken = null;
 
   if (rememberMe) {
     // Remember Me ON:
@@ -47,7 +48,7 @@ export const login = async (req, res) => {
     //   - Refresh cookie: 30-day maxAge, HTTP-only, scoped to /api/auth
     setAuthCookie(res, token, true);
 
-    const rawRefreshToken = generateRefreshToken();
+    rawRefreshToken = generateRefreshToken();
     const metadata = {
       userAgent: req.headers["user-agent"] ?? null,
       ipAddress: req.ip ?? null,
@@ -60,7 +61,7 @@ export const login = async (req, res) => {
     // No refresh cookie — purely session-based
   }
 
-  return sendSuccess(res, { ...user, rememberMe }, 200);
+  return sendSuccess(res, { ...user, token, refreshToken: rawRefreshToken, rememberMe }, 200);
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -68,7 +69,10 @@ export const login = async (req, res) => {
 // Phase 8A: transparently rotate refresh token and issue new access JWT
 // ─────────────────────────────────────────────────────────────────────────────
 export const refresh = async (req, res) => {
-  const rawToken = extractRefreshTokenFromCookie(req);
+  const rawToken =
+    extractRefreshTokenFromCookie(req) ||
+    req.headers["x-refresh-token"] ||
+    req.body?.refreshToken;
 
   if (!rawToken) {
     throw new UnauthorizedError("No refresh token present");
@@ -91,7 +95,7 @@ export const refresh = async (req, res) => {
   // Fetch user for the response
   const user = await authService.getCurrentUser(userId);
 
-  return sendSuccess(res, user, 200);
+  return sendSuccess(res, { ...user, token: newAccessToken, refreshToken: newRawToken }, 200);
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -100,7 +104,11 @@ export const refresh = async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const logout = async (req, res) => {
   // Revoke persistent session if one exists (Remember Me was ON)
-  const rawRefreshToken = extractRefreshTokenFromCookie(req);
+  const rawRefreshToken =
+    extractRefreshTokenFromCookie(req) ||
+    req.headers["x-refresh-token"] ||
+    req.body?.refreshToken;
+
   if (rawRefreshToken) {
     await revokeSessionByToken(rawRefreshToken).catch((err) => {
       console.warn("Session revocation warning during logout:", err.message);
@@ -143,9 +151,10 @@ export const googleAuth = async (req, res) => {
   const accessToken = generateToken({ userId: user.id });
   setAuthCookie(res, accessToken, Boolean(rememberMe));
 
+  let rawRefreshToken = null;
   // 4. If Remember Me is ON, create persistent refresh session
   if (rememberMe) {
-    const rawRefreshToken = generateRefreshToken();
+    rawRefreshToken = generateRefreshToken();
     const metadata = {
       userAgent: req.headers["user-agent"] ?? null,
       ipAddress: req.ip ?? null,
@@ -156,7 +165,11 @@ export const googleAuth = async (req, res) => {
     clearRefreshCookie(res);
   }
 
-  return sendSuccess(res, { ...user, rememberMe: Boolean(rememberMe) }, isNew ? 201 : 200);
+  return sendSuccess(
+    res,
+    { ...user, token: accessToken, refreshToken: rawRefreshToken, rememberMe: Boolean(rememberMe) },
+    isNew ? 201 : 200
+  );
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
